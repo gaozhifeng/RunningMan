@@ -24,4 +24,12 @@ class Start {
     }
 }
 
-Start::run(new RunningMan());
+$rm = new RunningMan('tcp://127.0.0.1:2345');
+$rm->onConnect = function ($connection) {
+    echo $connection->remoteClient . "已连接\n";
+};
+$rm->onMessage = function ($connection, $data) {
+    $connection->write('ok ' . $data);
+};
+
+Start::run($rm);

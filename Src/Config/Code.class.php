@@ -19,12 +19,16 @@ class Code {
     const ERR_NOT_RUN   = 5005;
     const ERR_RUNNING   = 5006;
 
+    const ERR_SOCKET    = 6001;
+
     public static $msg = [
         self::ERR_SYSTEM  => 'System error',
         self::ERR_MODE    => 'Please run in CLI mode',
         self::ERR_FORK    => 'Fork process failed',
         self::ERR_NOT_RUN => 'Not run',
         self::ERR_RUNNING => 'Already running',
+
+        self::ERR_SOCKET  => 'Socket Server failed',
     ];
 
 }

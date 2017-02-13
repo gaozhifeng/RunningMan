@@ -43,8 +43,12 @@ class Autoload {
             $classFile = str_replace($namespace, $namespaceMap[$namespace], $classFile);
         }
 
-        if (is_file($classFile) and is_readable($classFile)) {
-            require $classFile;
+        for ($i = 0; $i <= 1; $i ++) {
+            if (is_file($classFile) and is_readable($classFile)) {
+                require $classFile;
+                break;
+            }
+            $classFile = str_replace('.class.php', '.php', $classFile);
         }
     }
 
