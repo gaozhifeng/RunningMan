@@ -24,12 +24,28 @@ class Start {
     }
 }
 
-$rm = new RunningMan('tcp://127.0.0.1:2345');
-$rm->onConnect = function ($connection) {
-    echo $connection->remoteClient . "已连接\n";
-};
-$rm->onMessage = function ($connection, $data) {
-    $connection->write('ok ' . $data);
+$rmIns = new RunningMan('tcp://0.0.0.0:2345');
+$rmIns->onConnect = function ($connection) {
+    var_dump('onConnect');
 };
 
-Start::run($rm);
+$rmIns->onRecv = function ($connection, $data) {
+    $connection->write('ok ' . $data);
+
+    // 短连接调用关闭
+    // $connection->close();
+};
+
+$rmIns->onSend = function ($connection, $data) {
+    var_dump('onSend');
+};
+$rmIns->onClose = function () {
+    var_dump('onClose');
+};
+$rmIns->onError = function () {
+    $errMsg = socket_strerror(socket_last_error());
+    var_dump($errMsg);
+    var_dump('onError');
+};
+
+Start::run($rmIns);

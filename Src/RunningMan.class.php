@@ -25,7 +25,27 @@ class RunningMan {
     const BACKLOG = 65535;
 
     /**
-     * 守护程序
+     * 开始标记
+     */
+    const STATUS_START = 1;
+
+    /**
+     * 停止标记
+     */
+    CONST STATUS_STOP = 2;
+
+    /**
+     * 重启标记
+     */
+    const STATUS_RESTART = 4;
+
+    /**
+     * 重载标记
+     */
+    const STATUS_RELOAD = 8;
+
+    /**
+     * 守护进程
      * @var boolean
      */
     public $daemon = false;
@@ -49,22 +69,22 @@ class RunningMan {
     public $group = 'www';
 
     /**
-     * 运行状态
-     * @var null
-     */
-    public $status = null;
-
-    /**
      * 指令集合
      * @var array
      */
-    public $dirList = [];
+    private $dirList = ['start', 'stop', 'restart', 'reload', 'status'];
 
     /**
      * 指令
      * @var string
      */
     public $dir = '';
+
+    /**
+     * 运行状态
+     * @var int
+     */
+    public $status = 0;
 
     /**
      * 主进程Id
@@ -91,64 +111,76 @@ class RunningMan {
     public $logFile = '';
 
     /**
-     * Socket域名
+     * 监听地址
      * @var string
      */
-    public $localSocket = '';
+    public $localDomain = '';
 
     /**
-     * Socket上下文
-     * @var array
+     * 上下文
+     * @var object
      */
-    public $socketContext = null;
+    public $streamContext = null;
 
     /**
-     * ServerSocket
+     * 服务器Socket
      * @var stream
      */
     public $serverSocket = null;
 
     /**
-     * 消息回调
-     * @var string
+     * 连接回调
+     * @var object
      */
     public $onConnect = null;
-    public $onMessage = null;
-    public $onSend    = null;
-    public $onClose   = null;
-    public $onError   = null;
+
+    /**
+     * 消息回调
+     * @var object
+     */
+    public $onRecv = null;
+
+    /**
+     * 发送回调
+     * @var object
+     */
+    public $onSend = null;
+
+    /**
+     * 关闭回调
+     * @var object
+     */
+    public $onClose = null;
+
+    /**
+     * 错误回调
+     * @var object
+     */
+    public $onError = null;
 
     /**
      * 全局统计
      * @var array
      */
-    public $statistic = [];
+    public static $statistic = [];
 
     /**
      * 构造器
      */
     public function __construct($domain, $context = []) {
-        $this->dirList = [
-            'start',
-            'stop',
-            'restart',
-            'reload',
-            'status',
-        ];
-
         $this->pidFile = RM_RUNTIME . '/Log/RM.pid';
         $this->logFile = RM_RUNTIME . '/Log/RM.log';
 
-        $this->statistic['start_time'] = time();
+        self::$statistic['start_time'] = time();
 
-        $this->localSocket = $domain;
+        $this->localDomain = $domain;
 
-        $socketContext['socket']['backlog'] = self::BACKLOG;
-        $context = array_merge($context, $socketContext);
-        $this->socketContext = stream_context_create($context);
+        $streamContext['socket']['backlog'] = self::BACKLOG;
+        $streamContext = array_merge($streamContext, $context); // 注意顺序，后面覆盖前面
+        $this->streamContext = stream_context_create($streamContext);
 
         $this->onConnect = function () {};
-        $this->onMessage = function () {};
+        $this->onRecv    = function () {};
         $this->onSend    = function () {};
         $this->onClose   = function () {};
         $this->onError   = function () {};
@@ -171,6 +203,7 @@ class RunningMan {
             // 指令分发
             switch ($this->dir) {
                 case 'start':
+                #case 'restart':
                     // 启动进程
                     $this->startProcess();
                     // 启动画面
@@ -185,6 +218,10 @@ class RunningMan {
                     $this->stopProcess();
                     break;
 
+                case 'reload':
+                    $this->reloadProcess();
+                    break;
+
                 case 'status';
                     $this->statusProcess();
                     break;
@@ -193,11 +230,10 @@ class RunningMan {
                     break;
             }
         } catch (\Exception $e) {
-            $this->print(sprintf('Ecception [%s] %s %s:%s', $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()));
+            $this->print(sprintf('Exception [%s] %s %s:%s', $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()));
         } catch (\Error $e) {
             $this->print(sprintf('Error [%s] %s %s:%s', $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()));
         } finally {
-
         }
         exit;
     }
@@ -208,6 +244,7 @@ class RunningMan {
      * @throws Exception 异常
      */
     public function startProcess() {
+        $this->status = self::STATUS_START;
         cli_set_process_title('RunningMan: master process (' . __FILE__ . ')');
         if ($this->daemon) {
             umask(0);
@@ -268,11 +305,10 @@ class RunningMan {
             }
 
             // 注册信号
-            #$this->signalSubReg();
+            $this->signalSubReg();
 
             // 事件处理
             $this->eventLoop();
-            exit;
         }
     }
 
@@ -317,21 +353,31 @@ class RunningMan {
      */
     public function signalSubReg() {
         $signalList = [
+            SIGINT,
+            SIGUSR1,
             SIGUSR2,
         ];
 
         foreach ($signalList as $signal) {
             pcntl_signal($signal, function ($s) {
                 switch ($s) {
+                    case SIGINT:
+                        // 应该是 tcp 关闭
+                        #$this->connect and $this->connect->close($this->acceptSocket);
+                        exit;
+
+                    case SIGUSR1:
+                        echo 'SIGUSR1';
+                        break;
+
                     case SIGUSR2:
-                        var_dump('sss' . posix_getpid());
-                        #$this->statusProcess();
+                        $this->statusSubProcess();
                         break;
 
                     default:
                         break;
                 }
-            }, false);
+            });
         }
     }
 
@@ -349,11 +395,19 @@ class RunningMan {
             if ($pid > 0) {
                 $this->print("Worker pid [$pid] exit with status [$status]");
                 unset($this->pidMap[$this->masterPid][array_search($pid, $this->pidMap[$this->masterPid])]);
-                if (count($this->pidMap[$this->masterPid]) === 0) {
-                    unlink($this->pidFile);
-                    $this->print("\33[42;37;5m Stop success. \33[0m");
-                    exit;
+
+                // 非正常退出
+                if ($this->status != self::STATUS_STOP) {
+                    $this->forkProcess();
+                } else {
+                    if (count($this->pidMap[$this->masterPid]) === 0) {
+                        fclose($this->serverSocket);
+                        unlink($this->pidFile);
+                        $this->print("\33[42;37;5m Stop success. \33[0m");
+                        exit;
+                    }
                 }
+                /// 正常退出
             } else {
                 // 主进程 -1
             }
@@ -366,8 +420,10 @@ class RunningMan {
      * @throws Exception 异常
      */
     public function stopProcess() {
+        $this->status = self::STATUS_STOP;
+        // ctrl c 或 signal
         if ($this->masterPid == posix_getpid()) {
-            $this->print('...');
+            $this->print('Stopping...');
             foreach ($this->pidMap[$this->masterPid] as $pid) {
                 posix_kill($pid, SIGINT);
             }
@@ -383,7 +439,7 @@ class RunningMan {
      * @return void
      */
     public function reloadProcess() {
-
+        $this->status = self::STATUS_RELOAD;
     }
 
     /**
@@ -391,38 +447,76 @@ class RunningMan {
      * @return void
      */
     public function statusProcess() {
+        // signal
         if ($this->masterPid == posix_getpid()) {
-            echo 1;
-            /*foreach ($this->pidMap[$this->masterPid] as $pid) {
-                posix_kill($pid, SIGUSR2);
-            }*/
-        } else {
-            echo '2';
-        }
-/*        // 主进程
-        if ($this->masterPid == posix_getpid()) {
-            $loadavg = sys_getloadavg();
-            $workerTotal = count($this->pidMap[$this->masterPid]);
-            $startTime = date('Y-m-d H:i:s', $this->startTime);
+            $rmVersion  = Config\Config::VERSION;
+            $phpVersion = PHP_VERSION;
+            if ($this->daemon) {
+                $mode = 'Daemon';
+            } else {
+                $mode = 'Terminal';
+            }
 
-            $runTime   = time() - $this->startTime;
-            $runDay    = (int) ($runTime / 86400);
-            $runHour   = (int) ($runTime % 86400 / 3600);
-            $runMinute = (int) ($runTime % 86400 / 3600 / 60);
-$note = <<<EOF
+            $pid       = $this->masterPid;
+            $loadavg   = implode(', ', sys_getloadavg());
+            $memory    = round(memory_get_usage(true) / 1024 / 1024, 2);
+            $startTime = date('Y-m-d H:i:s', self::$statistic['start_time']);
+            $runTime   = time() - self::$statistic['start_time'];
+            $runDay    = intval($runTime / 86400);
+            $runHour   = intval($runTime % 86400 / 3600);
+            $runMinute = intval($runTime % 86400 % 3600 / 60);
+            $runSecond = intval($runTime % 86400 % 3600 % 60);
+            $runTime   = sprintf('%d天%d时%d分%d秒', $runDay, $runHour, $runMinute, $runSecond);
 
-----------------\33[47;30m RunningMan \33[0m----------------
-RM Version [$rmVersion]      PHP Version [$phpVersion]
-Mode [$mode]         Master PID [$this->masterPid]
-Start [$startTime] $runDayd$runHourh$runMinutem
-Master Process [1] Worker Process [$workerTotal]
+            $pidName     = str_pad('PID', 10, ' ');
+            $userName    = str_pad('Group-User', 14, ' ');
+            $listenName  = str_pad('Listen', 24, ' ');
+            $memoryName  = str_pad('Memory', 10, ' ');
+            $connectName = str_pad('Conn', 8, ' ');
+            $recvName    = str_pad('Recv', 8, ' ');
+            $sendName    = str_pad('Send', 8, ' ');
+            $closeName   = str_pad('Close', 8, ' ');
+            $errorName   = 'Error';
+echo <<<EOF
+___________________________________________\33[47;30m RunningMan \33[0m__________________________________________
+Master Process：
+ RM Version: ${rmVersion}    PHP Version: ${phpVersion}    Mode: ${mode}
+ PID: ${pid}    Loadavg: ${loadavg}    RunTime: ${startTime} (${runTime})    Memory: ${memory}M
+
+Worker Process：
+\33[47;30m ${pidName}${userName}${listenName}${memoryName}${connectName}${recvName}${sendName}${closeName}${errorName} \33[0m
 
 EOF;
+            foreach ($this->pidMap[$this->masterPid] as $pid) {
+                posix_kill($pid, SIGUSR2);
+            }
         } else {
-
+            $pid = file_get_contents($this->pidFile);
+            $pid and posix_kill($pid, SIGUSR2);
         }
-        /// 子进程
-        $this->note;*/
+        /// status 命令
+    }
+
+    /**
+     * 子进程状态
+     * @return void
+     */
+    public function statusSubProcess() {
+        $connect = str_pad(Connection\Tcp::$statistic['connect'], 8, ' ');
+        $recv    = str_pad(Connection\Tcp::$statistic['recv'], 8, ' ');
+        $send    = str_pad(Connection\Tcp::$statistic['send'], 8, ' ');
+        $close   = str_pad(Connection\Tcp::$statistic['close'], 8, ' ');
+        $error   = Connection\Tcp::$statistic['error'];
+
+        $pid    = str_pad(posix_getpid(), 10, ' ');
+        $user   = str_pad(sprintf('%s %s', $this->group, $this->user), 14, ' ');
+        $local  = str_pad($this->localDomain, 24, ' ');
+        $memory = str_pad(round(memory_get_usage(true) / 1024 / 1024, 2) . 'M', 10, ' ');
+
+echo <<<EOF
+ ${pid}${user}${local}${memory}${connect}${recv}${send}${close}${error}
+
+EOF;
     }
 
     /**
@@ -443,8 +537,8 @@ EOF;
      */
     public function parseDir() {
         global $argv;
-        $dir1 = $argv[1];
-        $dir2 = $argv[2];
+        $dir1 = isset($argv[1]) ? $argv[1] : null;
+        $dir2 = isset($argv[2]) ? $argv[2] : null;
 
         if (!in_array($dir1, $this->dirList)) {
             $exceMsg = sprintf('Usage: php %s {%s}', $argv[0], implode('|', $this->dirList));
@@ -482,6 +576,8 @@ EOF;
      */
     public function print($str) {
         $logStr = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $str);
+        // 设置权限
+        chmod($this->logFile, 0777);
         Common\Util::writeFile($this->logFile, $logStr);
         echo $str . "\n";
     }
@@ -503,7 +599,7 @@ EOF;
         }
 
         $l1 = strlen(sprintf('%s %s', $this->group, $this->user)) - strlen('User') + 1;
-        $l2 = strlen($this->localSocket) - strlen('Listen') + 2;
+        $l2 = strlen($this->localDomain) - strlen('Listen') + 2;
 
         $f1 = 'User' . str_pad(' ', $l1);
         $f2 = 'Listen' . str_pad(' ', $l2);
@@ -516,7 +612,7 @@ RM Version [$rmVersion]      PHP Version [$phpVersion]
 MODE [$mode]         Master PID [$this->masterPid]
 
 \33[47;30m ${f1} ${f2} ${f3} \33[0m
-$this->group $this->user   $this->localSocket   $this->worker
+$this->group $this->user   $this->localDomain   $this->worker
 
 \33[44;37;5m Start success. \33[0m  $tips
 EOF;
@@ -528,12 +624,12 @@ EOF;
      * @return void
      */
     public function listen() {
-        list($transport) = explode('://', $this->localSocket, 2);
+        list($transport) = explode('://', $this->localDomain, 2);
         $errno  = 0;
         $errmsg = '';
         $flag   = $transport === 'udp' ? STREAM_SERVER_BIND : STREAM_SERVER_BIND | STREAM_SERVER_LISTEN;
 
-        $this->serverSocket = stream_socket_server($this->localSocket, $errno, $errmsg, $flag, $this->socketContext);
+        $this->serverSocket = stream_socket_server($this->localDomain, $errno, $errmsg, $flag, $this->streamContext);
         if (!$this->serverSocket) {
             throw new \Exception(Config\Code::$msg[Config\Code::ERR_SOCKET], Config\Code::ERR_SOCKET);
         }
@@ -550,34 +646,32 @@ EOF;
      * @return void
      */
     public function eventLoop() {
-        $this->event = new Event\Select();
-        $this->event->add($this->serverSocket, Event\EventInterface::EV_READ, [$this, 'accept']);
-        $this->event->loop();
+        $eventIns = new Event\Select();
+        $eventIns->add($this->serverSocket, Event\EventInterface::EV_READ, [$this, 'accept']);
+        $eventIns->loop();
     }
 
     /**
      * 接收连接
      * @param  resource $serverSocket 服务器Socket
-     * @param  object   $event        事件对象
+     * @param  object   $eventHandler 事件对象
      * @return void
      */
-    public function accept($serverSocket, $event) {
-        // stream_socket_get_name
-        $acceptSocket = stream_socket_accept($serverSocket, 0, $remoteClient);
-        if (!$acceptSocket) {
-            throw new \Exception('Error Processing Request');
+    public function accept($serverSocket, $eventHandler) {
+        // 多个进程会造成惊群，没有accept 成功的进程会报错误
+        $acceptSocket = @stream_socket_accept($serverSocket, 0, $remoteClient);
+        if ($acceptSocket) {
+            $tcpIns = new Connection\Tcp();
+            $tcpIns->acceptSocket = $acceptSocket;
+            $tcpIns->remoteClient = $remoteClient;
+            $tcpIns->eventHandler = $eventHandler;
+            $tcpIns->onConnect    = $this->onConnect;
+            $tcpIns->onRecv       = $this->onRecv;
+            $tcpIns->onSend       = $this->onSend;
+            $tcpIns->onClose      = $this->onClose;
+            $tcpIns->onError      = $this->onError;
+            $tcpIns->accept();
         }
-
-        $tcpIns = new Connection\Tcp();
-        $tcpIns->serverSocket = $serverSocket;
-        $tcpIns->acceptSocket = $acceptSocket;
-        $tcpIns->remoteClient = $remoteClient;
-        $tcpIns->onConnect    = $this->onConnect;
-        $tcpIns->onMessage    = $this->onMessage;
-        $tcpIns->onSend       = $this->onSend;
-        $tcpIns->onClose      = $this->onClose;
-        $tcpIns->onError      = $this->onError;
-        $tcpIns->accept($event);
     }
 
 }

@@ -24,9 +24,9 @@ use RunningMan\Config;
 
 // 错误显示
 if (Config\Config::DEBUG) {
-    ini_set('display_errors', E_ALL);
-    error_reporting(1);
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
 } else {
-    ini_set('display_errors', 0);
     error_reporting(0);
+    ini_set('display_errors', 0);
 }

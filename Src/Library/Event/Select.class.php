@@ -31,9 +31,9 @@ class Select implements EventInterface {
     public $selectTimeOut = 100000000;
 
     /**
-     * 添加监听事件
+     * 添加事件
      * @param  resource $socket   监听socket
-     * @param  int      $flag     事件
+     * @param  int      $flag     事件类型
      * @param  string   $callback 回调
      * @return bool
      */
@@ -43,6 +43,27 @@ class Select implements EventInterface {
                 $sId                      = (int) $socket;
                 $this->event[$sId][$flag] = [$callback, $socket, $this];
                 $this->read[$sId]         = $socket;
+                break;
+
+            default:
+                break;
+        }
+
+        return true;
+    }
+
+    /**
+     * 删除事件
+     * @param  resource $socket 监听socket
+     * @param  int      $flag   事件类型
+     * @return bool
+     */
+    public function delete($socket, $flag) {
+        switch ($flag) {
+            case self::EV_READ:
+                $sId = (int) $socket;
+                unset($this->event[$sId][$flag]);
+                unset($this->read[$sId]);
                 break;
 
             default:
@@ -63,7 +84,7 @@ class Select implements EventInterface {
             $read   = $this->read;
             $write  = null;
             $accept = null;  // 非 null 将导致 stream_select 问题
-            $ret = stream_select($read, $write, $accept, 0, $this->selectTimeOut);
+            $ret = @stream_select($read, $write, $accept, 0, $this->selectTimeOut);
 
             if (!$ret) {
                 continue;
