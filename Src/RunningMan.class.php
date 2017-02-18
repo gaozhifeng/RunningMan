@@ -203,27 +203,22 @@ class RunningMan {
             // 指令分发
             switch ($this->dir) {
                 case 'start':
-                #case 'restart':
-                    // 启动进程
-                    $this->startProcess();
-                    // 启动画面
-                    $this->bootScreen();
-                    // 信号注册
-                    $this->signalReg();
-                    // 信号监听
-                    $this->signalWatch();
+                    $this->start();
                     break;
 
                 case 'stop':
-                    $this->stopProcess();
+                    $this->stop();
                     break;
 
+                case 'restart':
+                    $this->restart();
+
                 case 'reload':
-                    $this->reloadProcess();
+                    $this->reload();
                     break;
 
                 case 'status';
-                    $this->statusProcess();
+                    $this->status();
                     break;
 
                 default:
@@ -236,6 +231,21 @@ class RunningMan {
         } finally {
         }
         exit;
+    }
+
+    /**
+     * 开始
+     * @return void
+     */
+    public function start() {
+        // 启动进程
+        $this->startProcess();
+        // 启动画面
+        $this->bootScreen();
+        // 信号注册
+        $this->signalReg();
+        // 信号监听
+        $this->signalWatch();
     }
 
     /**
@@ -328,15 +338,15 @@ class RunningMan {
             pcntl_signal($signal, function ($s) {
                 switch ($s) {
                     case SIGINT:
-                        $this->stopProcess();
+                        $this->stop();
                         break;
 
                     case SIGUSR1:
-                        $this->reloadProcess();
+                        $this->reload();
                         break;
 
                     case SIGUSR2:
-                        $this->statusProcess();
+                        $this->status();
                         break;
 
                     default:
@@ -362,8 +372,7 @@ class RunningMan {
             pcntl_signal($signal, function ($s) {
                 switch ($s) {
                     case SIGINT:
-                        // 应该是 tcp 关闭
-                        #$this->connect and $this->connect->close($this->acceptSocket);
+                        // accept socket 关闭
                         exit;
 
                     case SIGUSR1:
@@ -393,7 +402,7 @@ class RunningMan {
             $pid = pcntl_wait($status, WUNTRACED);
             pcntl_signal_dispatch(); // pcntl_signal(, , false);   没有这个代码，发送 sigint 信号的时候，只有主进程退出
             if ($pid > 0) {
-                $this->print("Worker pid [$pid] exit with status [$status]");
+                $this->print("Worker process [$pid] exit with status [$status]");
                 unset($this->pidMap[$this->masterPid][array_search($pid, $this->pidMap[$this->masterPid])]);
 
                 // 非正常退出
@@ -419,7 +428,7 @@ class RunningMan {
      * @return void
      * @throws Exception 异常
      */
-    public function stopProcess() {
+    public function stop() {
         $this->status = self::STATUS_STOP;
         // ctrl c 或 signal
         if ($this->masterPid == posix_getpid()) {
@@ -435,18 +444,31 @@ class RunningMan {
     }
 
     /**
-     * 重载进程
+     * 重启
      * @return void
      */
-    public function reloadProcess() {
+    public function restart() {
+        $this->status = self::STATUS_RESTART;
+        $this->stop();
+        usleep(200000);  // 避免rest输出到中断与子进程退出状态重合
+        $this->print('Restarting...');
+        usleep(600000);  // 避免server socket 未释放完成
+        $this->start();
+    }
+
+    /**
+     * 重载
+     * @return void
+     */
+    public function reload() {
         $this->status = self::STATUS_RELOAD;
     }
 
     /**
-     * 进程状态
+     * 状态
      * @return void
      */
-    public function statusProcess() {
+    public function status() {
         // signal
         if ($this->masterPid == posix_getpid()) {
             $rmVersion  = Config\Config::VERSION;
@@ -477,7 +499,7 @@ class RunningMan {
             $sendName    = str_pad('Send', 8, ' ');
             $closeName   = str_pad('Close', 8, ' ');
             $errorName   = 'Error';
-echo <<<EOF
+$msg = <<<EOF
 ___________________________________________\33[47;30m RunningMan \33[0m__________________________________________
 Master Process：
  RM Version: ${rmVersion}    PHP Version: ${phpVersion}    Mode: ${mode}
@@ -487,6 +509,7 @@ Worker Process：
 \33[47;30m ${pidName}${userName}${listenName}${memoryName}${connectName}${recvName}${sendName}${closeName}${errorName} \33[0m
 
 EOF;
+            $this->print($msg);
             foreach ($this->pidMap[$this->masterPid] as $pid) {
                 posix_kill($pid, SIGUSR2);
             }
@@ -513,10 +536,11 @@ EOF;
         $local  = str_pad($this->localDomain, 24, ' ');
         $memory = str_pad(round(memory_get_usage(true) / 1024 / 1024, 2) . 'M', 10, ' ');
 
-echo <<<EOF
+$msg = <<<EOF
  ${pid}${user}${local}${memory}${connect}${recv}${send}${close}${error}
 
 EOF;
+        $this->print($msg);
     }
 
     /**
@@ -576,8 +600,7 @@ EOF;
      */
     public function print($str) {
         $logStr = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $str);
-        // 设置权限
-        chmod($this->logFile, 0777);
+        chmod($this->logFile, 0777); // 父子进程可写权限
         Common\Util::writeFile($this->logFile, $logStr);
         echo $str . "\n";
     }
