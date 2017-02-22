@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @brief        Select 轮询模型
+ * @brief        Select 事件驱动模型
  *
  * @author       Feng <mail.gzf@foxmail.com>
  * @since        2017-2-4 18:52:01
@@ -39,6 +39,12 @@ class Select implements EventInterface {
      */
     public function add($socket, $flag, $callback) {
         switch ($flag) {
+            case self::EV_SIGNAL:
+                $sId                      = (int) $socket;
+                $this->event[$sId][$flag] = [$callback, $socket, $this];
+                pcntl_signal($socket, $callback);
+                break;
+
             case self::EV_READ:
                 $sId                      = (int) $socket;
                 $this->event[$sId][$flag] = [$callback, $socket, $this];
@@ -54,14 +60,20 @@ class Select implements EventInterface {
 
     /**
      * 删除事件
-     * @param  resource $socket 监听socket
+     * @param  resource $fd 监听socket
      * @param  int      $flag   事件类型
      * @return bool
      */
-    public function delete($socket, $flag) {
+    public function delete($fd, $flag) {
         switch ($flag) {
+            case self::EV_SIGNAL:
+                $sId = (int) $fd;
+                unset($this->event[$sId][$flag]);
+                pcntl_signal($fd, SIG_IGN, false);
+                break;
+
             case self::EV_READ:
-                $sId = (int) $socket;
+                $sId = (int) $fd;
                 unset($this->event[$sId][$flag]);
                 unset($this->read[$sId]);
                 break;
@@ -84,7 +96,7 @@ class Select implements EventInterface {
             $read   = $this->read;
             $write  = null;
             $accept = null;  // 非 null 将导致 stream_select 问题
-            $ret = @stream_select($read, $write, $accept, 0, $this->selectTimeOut);
+            $ret    = @stream_select($read, $write, $accept, 0, $this->selectTimeOut);
 
             if (!$ret) {
                 continue;
@@ -95,7 +107,7 @@ class Select implements EventInterface {
                 $sId = (int) $fd;
                 if (isset($this->event[$sId][self::EV_READ])) {
                     call_user_func_array($this->event[$sId][self::EV_READ][0],
-                        [$this->event[$sId][self::EV_READ][1], $this->event[$sId][self::EV_READ][2]]);
+                        [$this->event[$sId][self::EV_READ][1], self::EV_READ, $this->event[$sId][self::EV_READ][2]]);
                 }
             }
         }

@@ -22,7 +22,7 @@ class RunningMan {
     /**
      * backlog
      */
-    const BACKLOG = 65535;
+    const BACKLOG = 512;
 
     /**
      * 开始标记
@@ -79,6 +79,12 @@ class RunningMan {
      * @var string
      */
     public $dir = '';
+
+    /**
+     * 信号列表
+     * @var array
+     */
+    public $signalList = [SIGINT, SIGUSR1, SIGUSR2];
 
     /**
      * 运行状态
@@ -159,6 +165,18 @@ class RunningMan {
     public $onError = null;
 
     /**
+     * 事件驱动列表
+     * @var array
+     */
+    public $eventList = ['Libevent'];
+
+    /**
+     * 事件驱动名
+     * @var string
+     */
+    public $eventName = 'Select';
+
+    /**
      * 全局统计
      * @var array
      */
@@ -170,6 +188,8 @@ class RunningMan {
     public function __construct($domain, $context = []) {
         $this->pidFile = RM_RUNTIME . '/Log/RM.pid';
         $this->logFile = RM_RUNTIME . '/Log/RM.log';
+        touch($this->logFile);
+        chmod($this->logFile, 0622);
 
         self::$statistic['start_time'] = time();
 
@@ -178,6 +198,14 @@ class RunningMan {
         $streamContext['socket']['backlog'] = self::BACKLOG;
         $streamContext = array_merge($streamContext, $context); // 注意顺序，后面覆盖前面
         $this->streamContext = stream_context_create($streamContext);
+
+        // 事件驱动
+        $this->eventName = 'Select';
+        foreach ($this->eventList as $ev) {
+            if (extension_loaded($ev)) {
+                $this->eventName = $ev;
+            }
+        }
 
         $this->onConnect = function () {};
         $this->onRecv    = function () {};
@@ -314,11 +342,9 @@ class RunningMan {
                 posix_setgid($group['gid']);
             }
 
-            // 注册信号
-            $this->signalSubReg();
-
             // 事件处理
             $this->eventLoop();
+            exit; // 无 exit 会导致子进程运行只有主进程的方法
         }
     }
 
@@ -328,13 +354,7 @@ class RunningMan {
      * @throws Exception 异常
      */
     public function signalReg() {
-        $signalList = [
-            SIGINT,
-            SIGUSR1,
-            SIGUSR2,
-        ];
-
-        foreach ($signalList as $signal) {
+        foreach ($this->signalList as $signal) {
             pcntl_signal($signal, function ($s) {
                 switch ($s) {
                     case SIGINT:
@@ -358,35 +378,26 @@ class RunningMan {
     }
 
     /**
-     * 子进程信号注册
+     * 进程信号处理
+     * @param  int $signal 信号量
      * @return void
      */
-    public function signalSubReg() {
-        $signalList = [
-            SIGINT,
-            SIGUSR1,
-            SIGUSR2,
-        ];
+    public function signalHandler($signal) {
+        switch ($signal) {
+            case SIGINT:
+                // accept socket 关闭
+                exit;
 
-        foreach ($signalList as $signal) {
-            pcntl_signal($signal, function ($s) {
-                switch ($s) {
-                    case SIGINT:
-                        // accept socket 关闭
-                        exit;
+            case SIGUSR1:
+                echo 'SIGUSR1';
+                break;
 
-                    case SIGUSR1:
-                        echo 'SIGUSR1';
-                        break;
+            case SIGUSR2:
+                $this->statusSubProcess();
+                break;
 
-                    case SIGUSR2:
-                        $this->statusSubProcess();
-                        break;
-
-                    default:
-                        break;
-                }
-            });
+            default:
+                break;
         }
     }
 
@@ -479,6 +490,7 @@ class RunningMan {
                 $mode = 'Terminal';
             }
 
+            $event     = $this->eventName;
             $pid       = $this->masterPid;
             $loadavg   = implode(', ', sys_getloadavg());
             $memory    = round(memory_get_usage(true) / 1024 / 1024, 2);
@@ -502,12 +514,11 @@ class RunningMan {
 $msg = <<<EOF
 ___________________________________________\33[47;30m RunningMan \33[0m__________________________________________
 Master Process：
- RM Version: ${rmVersion}    PHP Version: ${phpVersion}    Mode: ${mode}
+ RM Version: ${rmVersion}    PHP Version: ${phpVersion}    Mode: ${mode}    EV: ${event}
  PID: ${pid}    Loadavg: ${loadavg}    RunTime: ${startTime} (${runTime})    Memory: ${memory}M
 
 Worker Process：
 \33[47;30m ${pidName}${userName}${listenName}${memoryName}${connectName}${recvName}${sendName}${closeName}${errorName} \33[0m
-
 EOF;
             $this->print($msg);
             foreach ($this->pidMap[$this->masterPid] as $pid) {
@@ -538,7 +549,6 @@ EOF;
 
 $msg = <<<EOF
  ${pid}${user}${local}${memory}${connect}${recv}${send}${close}${error}
-
 EOF;
         $this->print($msg);
     }
@@ -600,8 +610,7 @@ EOF;
      */
     public function print($str) {
         $logStr = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $str);
-        chmod($this->logFile, 0777); // 父子进程可写权限
-        Common\Util::writeFile($this->logFile, $logStr);
+        Common\Util::writeFile($this->logFile, $logStr, 0777);
         echo $str . "\n";
     }
 
@@ -630,9 +639,9 @@ EOF;
 
 $note = <<<EOF
 
-----------------\33[47;30m RunningMan \33[0m----------------
+-------------------\33[47;30m RunningMan \33[0m-------------------
 RM Version [$rmVersion]      PHP Version [$phpVersion]
-MODE [$mode]         Master PID [$this->masterPid]
+MODE [$mode]  EV [$this->eventName]  Master PID [$this->masterPid]
 
 \33[47;30m ${f1} ${f2} ${f3} \33[0m
 $this->group $this->user   $this->localDomain   $this->worker
@@ -661,7 +670,7 @@ EOF;
         socket_set_option($serverSocket, SOL_SOCKET, SO_KEEPALIVE, 1);
         socket_set_option($serverSocket, SOL_TCP, TCP_NODELAY, 1);
 
-        stream_set_blocking($this->serverSocket, 0);
+        stream_set_blocking($this->serverSocket, 0); // 非阻塞
     }
 
     /**
@@ -669,8 +678,15 @@ EOF;
      * @return void
      */
     public function eventLoop() {
-        $eventIns = new Event\Select();
+        $eventClass = __NAMESPACE__ . '\\Library\Event\\' . ucfirst($this->eventName);
+        $eventIns = new $eventClass();
         $eventIns->add($this->serverSocket, Event\EventInterface::EV_READ, [$this, 'accept']);
+
+        // 注册子进程信号处理
+        foreach ($this->signalList as $signal) {
+            pcntl_signal($signal, SIG_IGN, false);
+            $eventIns->add($signal, Event\EventInterface::EV_SIGNAL, [$this, 'signalHandler']);
+        }
         $eventIns->loop();
     }
 
@@ -680,9 +696,9 @@ EOF;
      * @param  object   $eventHandler 事件对象
      * @return void
      */
-    public function accept($serverSocket, $eventHandler) {
-        // 多个进程会造成惊群，没有accept 成功的进程会报错误
-        $acceptSocket = @stream_socket_accept($serverSocket, 0, $remoteClient);
+    public function accept($serverSocket, $flag, $eventHandler) {
+        // 多个进程会造成惊群，没有accept 成功的进程会报错误 使用@屏蔽
+        $acceptSocket = stream_socket_accept($serverSocket, 0, $remoteClient);
         if ($acceptSocket) {
             $tcpIns = new Connection\Tcp();
             $tcpIns->acceptSocket = $acceptSocket;

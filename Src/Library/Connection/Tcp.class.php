@@ -87,7 +87,7 @@ class Tcp {
     public function accept() {
         ++ self::$statistic['connect'] ;
 
-        stream_set_blocking($this->acceptSocket, 0);
+        stream_set_blocking($this->acceptSocket, 0); // 非阻塞
 
         // 执行回调
         $this->onConnect and call_user_func($this->onConnect, $this);
@@ -137,7 +137,7 @@ class Tcp {
 
             $content = $data;
             while (true) {
-                $len = @fwrite($this->acceptSocket, $content);
+                $len = @stream_socket_sendto($this->acceptSocket, $content);
                 if (empty($len)) {
                     ++ self::$statistic['error'];
                     $this->onError and call_user_func($this->onError, $this);

@@ -24,12 +24,12 @@ class Start {
     }
 }
 
-$rmIns = new RunningMan('tcp://0.0.0.0:2345');
+$rmIns = new RunningMan('tcp://0.0.0.0:7266');
 $rmIns->onConnect = function ($connection) {
     var_dump('onConnect');
 };
 
-$rmIns->onRecv = function ($connection, $data) {
+$rmIns->onRecv = function ($connection, $data) {var_dump($connection->remoteClient);
     $connection->write('ok ' . $data);
 
     // 短连接调用关闭

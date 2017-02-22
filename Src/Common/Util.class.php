@@ -30,7 +30,7 @@ class Util {
      * @return bool
      */
     public static function makeDirs( $name, $mode = 0777 ) {
-        return is_dir( $name ) or ( self::makeDirs(dirname($name), $mode) and mkdir($name, $mode) );
+        return is_dir($name) or (self::makeDirs(dirname($name), $mode) and mkdir($name, $mode));
     }
 
 }
