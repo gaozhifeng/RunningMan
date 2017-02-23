@@ -1,15 +1,19 @@
 # 关于：
-> **RunningMan** 是基于多进程管理器的TCP服务器
+> **RunningMan** 多进程Socket 框架
 
-* 极客轻量
-* 多进程管理
+    1.start stop restart reload status 指令
+    2.SIGINT(stop) SIGUSR1(reload) SIGUSR2(status) 信号
+    3.TCP UDP 网络协议支持
+    4.select poll epoll 事件处理模型支持
+    5.Text PB Json 数据序列化支持
 
 # 目录：
     Src
-       |- Common  公共文件
-       |- Config  配置文件
-       |- Runtime 运行文件
-    Start.class.php   示例文件
+       |- Common  公共
+       |- Config  配置
+       |- Library 库
+       |- Runtime 运行
+    Start.class.php   示例
 
 ----------
 

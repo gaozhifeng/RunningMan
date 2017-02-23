@@ -137,8 +137,8 @@ class Tcp {
 
             $content = $data;
             while (true) {
-                $len = @stream_socket_sendto($this->acceptSocket, $content);
-                if (empty($len)) {
+                $len = stream_socket_sendto($this->acceptSocket, $content);
+                if ($len < 1) {
                     ++ self::$statistic['error'];
                     $this->onError and call_user_func($this->onError, $this);
                     $this->close();
@@ -167,6 +167,7 @@ class Tcp {
         is_resource($this->acceptSocket) and fclose($this->acceptSocket);
         // 删除事件
         $this->eventHandler->delete($this->acceptSocket, Event\EventInterface::EV_READ);
+        $this->eventHandler->delete($this->acceptSocket, Event\EventInterface::EV_SIGNAL);
         // 执行回调
         $this->onClose and call_user_func($this->onClose, $this);
     }

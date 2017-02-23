@@ -81,6 +81,18 @@ class RunningMan {
     public $dir = '';
 
     /**
+     * 事件驱动列表
+     * @var array
+     */
+    public $eventList = ['libevent'];
+
+    /**
+     * 事件驱动名
+     * @var string
+     */
+    public $eventName = 'select';
+
+    /**
      * 信号列表
      * @var array
      */
@@ -165,18 +177,6 @@ class RunningMan {
     public $onError = null;
 
     /**
-     * 事件驱动列表
-     * @var array
-     */
-    public $eventList = ['Libevent'];
-
-    /**
-     * 事件驱动名
-     * @var string
-     */
-    public $eventName = 'Select';
-
-    /**
      * 全局统计
      * @var array
      */
@@ -200,7 +200,6 @@ class RunningMan {
         $this->streamContext = stream_context_create($streamContext);
 
         // 事件驱动
-        $this->eventName = 'Select';
         foreach ($this->eventList as $ev) {
             if (extension_loaded($ev)) {
                 $this->eventName = $ev;
@@ -561,6 +560,11 @@ EOF;
     public function checkSapi() {
         if (PHP_SAPI != 'cli') {
             throw new \Exception(Config\Code::$msg[Config\Code::ERR_MODE], Config\Code::ERR_MODE);
+        }
+
+        if (!extension_loaded('pcntl') or
+            !extension_loaded('posix')) {
+            throw new \Exception(Config\Code::$msg[Config\Code::ERR_EXTENSION], Config\Code::ERR_EXTENSION);
         }
     }
 
