@@ -12,15 +12,17 @@ namespace RunningMan\Config;
 
 class Code {
 
-    const ERR_SYSTEM    = 5001;
-    const ERR_MODE      = 5002;
-    const ERR_EXTENSION = 5003;
-    const ERR_DIRECTIVE = 5004;
-    const ERR_FORK      = 5005;
-    const ERR_NOT_RUN   = 5006;
-    const ERR_RUNNING   = 5007;
+    const ERR_SYSTEM    = 1001;
+    const ERR_MODE      = 1002;
+    const ERR_EXTENSION = 1003;
+    const ERR_DIRECTIVE = 1004;
+    const ERR_FORK      = 1005;
+    const ERR_NOT_RUN   = 1006;
+    const ERR_RUNNING   = 1007;
 
-    const ERR_SOCKET    = 6001;
+    const ERR_CONNECT_SERVER = 2001;
+    CONST ERR_EVENT          = 3001;
+    const ERR_PROTOCOL       = 4001;
 
     public static $msg = [
         self::ERR_SYSTEM    => 'System error',
@@ -31,7 +33,9 @@ class Code {
         self::ERR_NOT_RUN   => 'Not run',
         self::ERR_RUNNING   => 'Already running',
 
-        self::ERR_SOCKET  => 'Socket Server failed',
+        self::ERR_CONNECT_SERVER => 'Socket Server failed',
+        self::ERR_EVENT          => 'Error event',
+        self::ERR_PROTOCOL       => 'Error protocol',
     ];
 
 }

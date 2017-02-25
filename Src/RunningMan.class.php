@@ -14,6 +14,7 @@ use RunningMan\Common;
 use RunningMan\Config;
 use RunningMan\Library\Event;
 use RunningMan\Library\Connection;
+use RunningMan\Library\Protocol;
 
 require __DIR__ . '/Common/bootstrap.inc.php';
 
@@ -52,6 +53,7 @@ class RunningMan {
 
     /**
      * 子进程数
+     * 一般设置为 CPU 核数的2倍
      * @var integer
      */
     public $worker = 3;
@@ -91,6 +93,24 @@ class RunningMan {
      * @var string
      */
     public $eventName = 'select';
+
+    /**
+     * 交换协议列表
+     * @var array
+     */
+    public $protocolList = ['text'];
+
+    /**
+     * 交换协议名
+     * @var string
+     */
+    public $protocolName = 'text';
+
+    /**
+     * 交换协议
+     * @var null
+     */
+    public $protocol = null;
 
     /**
      * 信号列表
@@ -198,6 +218,12 @@ class RunningMan {
         $streamContext['socket']['backlog'] = self::BACKLOG;
         $streamContext = array_merge($streamContext, $context); // 注意顺序，后面覆盖前面
         $this->streamContext = stream_context_create($streamContext);
+
+        if (!in_array($this->protocolName, $this->protocolList)) {
+            throw new \Exception(Config\Code::$msg[Config\Code::ERR_PROTOCOL], Config\Code::ERR_PROTOCOL);
+        }
+        $protocolClass = __NAMESPACE__ . '\\Library\\Protocol\\' . ucfirst($this->protocolName);
+        $this->protocol = new $protocolClass();
 
         // 事件驱动
         foreach ($this->eventList as $ev) {
@@ -490,6 +516,7 @@ class RunningMan {
             }
 
             $event     = $this->eventName;
+            $protocol  = $this->protocolName;
             $pid       = $this->masterPid;
             $loadavg   = implode(', ', sys_getloadavg());
             $memory    = round(memory_get_usage(true) / 1024 / 1024, 2);
@@ -513,7 +540,7 @@ class RunningMan {
 $msg = <<<EOF
 ___________________________________________\33[47;30m RunningMan \33[0m__________________________________________
 Master Process：
- RM Version: ${rmVersion}    PHP Version: ${phpVersion}    Mode: ${mode}    EV: ${event}
+ RM Version: ${rmVersion}    PHP Version: ${phpVersion}    Mode: ${mode}    EV: ${event}    Protocol: ${protocol}
  PID: ${pid}    Loadavg: ${loadavg}    RunTime: ${startTime} (${runTime})    Memory: ${memory}M
 
 Worker Process：
@@ -626,6 +653,9 @@ EOF;
         $rmVersion  = Config\Config::VERSION;
         $phpVersion = PHP_VERSION;
 
+        $event    = $this->eventName;
+        $protocol = $this->protocolName;
+
         if ($this->daemon) {
             $mode = 'Daemon';
             $tips = 'Press stop directive to quit.';
@@ -645,7 +675,8 @@ $note = <<<EOF
 
 -------------------\33[47;30m RunningMan \33[0m-------------------
 RM Version [$rmVersion]      PHP Version [$phpVersion]
-MODE [$mode]  EV [$this->eventName]  Master PID [$this->masterPid]
+MODE [$mode]  Event [$event]  Protocol [$protocol]
+Master PID [$this->masterPid]
 
 \33[47;30m ${f1} ${f2} ${f3} \33[0m
 $this->group $this->user   $this->localDomain   $this->worker
@@ -667,7 +698,7 @@ EOF;
 
         $this->serverSocket = stream_socket_server($this->localDomain, $errno, $errmsg, $flag, $this->streamContext);
         if (!$this->serverSocket) {
-            throw new \Exception(Config\Code::$msg[Config\Code::ERR_SOCKET], Config\Code::ERR_SOCKET);
+            throw new \Exception(Config\Code::$msg[Config\Code::ERR_CONNECT_SERVER], Config\Code::ERR_CONNECT_SERVER);
         }
 
         $serverSocket = socket_import_stream($this->serverSocket);
@@ -708,6 +739,7 @@ EOF;
             $tcpIns->acceptSocket = $acceptSocket;
             $tcpIns->remoteClient = $remoteClient;
             $tcpIns->eventHandler = $eventHandler;
+            $tcpIns->protocol     = $this->protocol;
             $tcpIns->onConnect    = $this->onConnect;
             $tcpIns->onRecv       = $this->onRecv;
             $tcpIns->onSend       = $this->onSend;

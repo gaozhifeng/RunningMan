@@ -38,6 +38,9 @@ class Tcp {
      */
     public $remoteClient = '';
 
+    public $protocol = '';
+    public $recvBuffer = '';
+
     /**
      * 连接回调
      * @var object
@@ -102,20 +105,33 @@ class Tcp {
      * @return void
      */
     public function read($acceptSocket) {
-        ++ self::$statistic['recv'];
-
-        $content = '';
-        while (true) {
-            // STREAM_PEEK 会导致 stream_select 不断循环
-            $recv = stream_socket_recvfrom($acceptSocket, self::READ_BUFFER_SIZE);
-            if ($recv === '' || !$recv || feof($acceptSocket)) {
+        // STREAM_PEEK 会导致 stream_select 不断循环
+        $this->recvBuffer .= stream_socket_recvfrom($acceptSocket, self::READ_BUFFER_SIZE);
+        $flag = true;
+        while ($flag) {
+            // 客户端断开会导致读为空
+            if ($this->recvBuffer === '' || $this->recvBuffer === false || feof($acceptSocket)) {
+                $this->close();
                 break;
             }
-            $content .= $recv;
-        }
 
-        // 执行回调
-        $this->onRecv and call_user_func($this->onRecv, $this, $content);
+            $strpos = $this->protocol->unPackPos($this->recvBuffer);
+            if (!empty($strpos)) {
+                if (strlen($this->recvBuffer) == $strpos) {
+                    $flag = false;
+                }
+                $recvPack = substr($this->recvBuffer, 0, $strpos);
+                $this->recvBuffer = substr($this->recvBuffer, $strpos + 1);
+
+                ++ self::$statistic['recv'];
+
+                // 执行回调
+                $this->onRecv and call_user_func($this->onRecv, $this, $recvPack);
+            } else {
+                $flag = false;
+                break;
+            }
+        }
 
         return;
     }
@@ -135,7 +151,7 @@ class Tcp {
                 break;
             }
 
-            $content = $data;
+            $content = $this->protocol->pack($data);
             while (true) {
                 $len = stream_socket_sendto($this->acceptSocket, $content);
                 if ($len < 1) {
