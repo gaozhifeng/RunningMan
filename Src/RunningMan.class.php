@@ -53,7 +53,6 @@ class RunningMan {
 
     /**
      * 子进程数
-     * 一般设置为 CPU 核数的2倍
      * @var integer
      */
     public $worker = 3;

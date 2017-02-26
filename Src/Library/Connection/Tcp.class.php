@@ -38,8 +38,17 @@ class Tcp {
      */
     public $remoteClient = '';
 
-    public $protocol = '';
+    /**
+     * 读Buffer
+     * @var string
+     */
     public $recvBuffer = '';
+
+    /**
+     * 交换协议
+     * @var string
+     */
+    public $protocol = null;
 
     /**
      * 连接回调
@@ -117,7 +126,7 @@ class Tcp {
 
             $strpos = $this->protocol->unPackPos($this->recvBuffer);
             if (!empty($strpos)) {
-                if (strlen($this->recvBuffer) == $strpos) {
+                if (strlen($this->recvBuffer) - 1 == $strpos) {
                     $flag = false;
                 }
                 $recvPack = substr($this->recvBuffer, 0, $strpos);

@@ -28,9 +28,8 @@ class Text {
      */
     public function unPackPos($data) {
         $ret = false;
-
         do {
-            $pos = stripos($data, "\n");
+            $pos = strpos($data, "\n");
             if ($pos === false) {
                 break;
             }
