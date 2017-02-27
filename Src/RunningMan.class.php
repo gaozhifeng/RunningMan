@@ -260,6 +260,7 @@ class RunningMan {
 
                 case 'stop':
                     $this->stop();
+                    usleep(100000); // 完整中断输出 usleep 放在stop() 尾会执行 nanosleep 使终端出现 line name
                     break;
 
                 case 'restart':
@@ -271,6 +272,7 @@ class RunningMan {
 
                 case 'status';
                     $this->status();
+                    usleep(100000);
                     break;
 
                 default:
@@ -434,7 +436,7 @@ class RunningMan {
         while (true) {
             pcntl_signal_dispatch();
             $status = 0;
-            $pid = pcntl_wait($status, WUNTRACED);
+            $pid = pcntl_wait($status);    // 非 wait3 第二个参数无效
             pcntl_signal_dispatch(); // pcntl_signal(, , false);   没有这个代码，发送 sigint 信号的时候，只有主进程退出
             if ($pid > 0) {
                 $this->print("Worker process [$pid] exit with status [$status]");
@@ -544,6 +546,7 @@ Master Process：
 
 Worker Process：
 \33[47;30m ${pidName}${userName}${listenName}${memoryName}${connectName}${recvName}${sendName}${closeName}${errorName} \33[0m
+
 EOF;
             $this->print($msg);
             foreach ($this->pidMap[$this->masterPid] as $pid) {
@@ -574,6 +577,7 @@ EOF;
 
 $msg = <<<EOF
  ${pid}${user}${local}${memory}${connect}${recv}${send}${close}${error}
+
 EOF;
         $this->print($msg);
     }
@@ -640,7 +644,7 @@ EOF;
      */
     public function print($str) {
         $logStr = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $str);
-        Common\Util::writeFile($this->logFile, $logStr, 0777);
+        Common\Util::writeFile($this->logFile, $logStr);
         echo $str . "\n";
     }
 
