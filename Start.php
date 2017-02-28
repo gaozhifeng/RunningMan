@@ -30,11 +30,11 @@ $rmIns = new RunningMan('tcp://0.0.0.0:7266');
 
 $rmIns->onRecv = function ($connection, $data) {
     $msg = sprintf('[%s] Server To %s: %s', date('Y-m-d H:i:s'), $connection->remoteClient, $data);
-    #$time = date('Y-m-d H:i:s');
-    #$body = "Hello World 北京 ${time}";
-    #$chunk = dechex(strlen($body));
+    /*$time = date('Y-m-d H:i:s');
+    $body = "Hello World 北京 ${time}";
+    $chunk = dechex(strlen($body));
 
-    #$msg = "HTTP/1.1 200 OK\r\nContent-type: text/html\r\nServer: RunningMan 0.0.1\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n${chunk}\r\n$body\r\n0\r\n\r\n";
+    $msg = "HTTP/1.1 200 OK\r\nContent-type: text/html\r\nServer: RunningMan 0.0.1\r\nTransfer-Encoding: chunked\r\nConnection: keep-alive\r\n\r\n${chunk}\r\n$body\r\n0\r\n\r\n";*/
     $connection->write($msg);
 
     // 短连接调用关闭

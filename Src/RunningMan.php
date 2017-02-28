@@ -80,61 +80,61 @@ class RunningMan
      * 指令
      * @var string
      */
-    public $dir = '';
+    private $dir = '';
 
     /**
      * 事件驱动列表
      * @var array
      */
-    public $eventList = ['libevent'];
+    private $eventList = ['libevent'];
 
     /**
      * 事件驱动名
      * @var string
      */
-    public $eventName = 'select';
+    private $eventName = 'select';
 
     /**
      * 交换协议列表
      * @var array
      */
-    public $protocolList = ['text'];
+    private $protocolList = ['text'];
 
     /**
      * 交换协议名
      * @var string
      */
-    public $protocolName = 'text';
+    private $protocolName = 'text';
 
     /**
      * 交换协议
      * @var null
      */
-    public $protocol = null;
+    private $protocol = null;
 
     /**
      * 信号列表
      * @var array
      */
-    public $signalList = [SIGINT, SIGUSR1, SIGUSR2];
+    private $signalList = [SIGINT, SIGUSR1, SIGUSR2];
 
     /**
      * 运行状态
      * @var int
      */
-    public $status = 0;
+    private $status = 0;
 
     /**
      * 主进程Id
      * @var integer
      */
-    public $masterPid = 0;
+    private $masterPid = 0;
 
     /**
      * 进程Id
      * @var array
      */
-    public $pidMap = [];
+    private $pidMap = [];
 
     /**
      * 进程文件
@@ -214,12 +214,15 @@ class RunningMan
 
         self::$statistic['start_time'] = time();
 
+        // 监听地址
         $this->localDomain = $domain;
 
+        // 流上下文
         $streamContext['socket']['backlog'] = self::BACKLOG;
         $streamContext = array_merge($streamContext, $context); // 注意顺序，后面覆盖前面
         $this->streamContext = stream_context_create($streamContext);
 
+        // 交换协议
         if (!in_array($this->protocolName, $this->protocolList)) {
             throw new \Exception(Config\Code::$msg[Config\Code::ERR_PROTOCOL], Config\Code::ERR_PROTOCOL);
         }
@@ -233,6 +236,7 @@ class RunningMan
             }
         }
 
+        // 回调初始化
         $this->onConnect = function () {};
         $this->onRecv    = function () {};
         $this->onSend    = function () {};
@@ -271,6 +275,7 @@ class RunningMan
 
                 case 'reload':
                     $this->reload();
+                    usleep(100000); // 完整中断输出
                     break;
 
                 case 'status';
@@ -421,12 +426,9 @@ class RunningMan
     {
         switch ($signal) {
             case SIGINT:
+            case SIGUSR1:
                 // accept socket 关闭
                 exit;
-
-            case SIGUSR1:
-                echo 'SIGUSR1';
-                break;
 
             case SIGUSR2:
                 $this->statusSubProcess();
@@ -447,7 +449,7 @@ class RunningMan
         while (true) {
             pcntl_signal_dispatch();
             $status = 0;
-            $pid = pcntl_wait($status);    // 非 wait3 第二个参数无效
+            $pid = pcntl_wait($status); // 非 wait3 第二个参数无效
             pcntl_signal_dispatch(); // pcntl_signal(, , false);   没有这个代码，发送 sigint 信号的时候，只有主进程退出
             if ($pid > 0) {
                 $this->print("Worker process [$pid] exit with status [$status]");
@@ -510,8 +512,20 @@ class RunningMan
      * 重载
      * @return void
      */
-    public function reload() {
+    public function reload()
+    {
         $this->status = self::STATUS_RELOAD;
+        // ctrl c 或 signal
+        if ($this->masterPid == posix_getpid()) {
+            $this->print('Reloading...');
+            foreach ($this->pidMap[$this->masterPid] as $pid) {
+                posix_kill($pid, SIGUSR1);
+            }
+        } else {
+            $pid = file_get_contents($this->pidFile);
+            $pid and posix_kill($pid, SIGUSR1);
+        }
+        /// stop 命令
     }
 
     /**
