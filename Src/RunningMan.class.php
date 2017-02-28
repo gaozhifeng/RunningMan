@@ -260,7 +260,7 @@ class RunningMan {
 
                 case 'stop':
                     $this->stop();
-                    usleep(100000); // 完整中断输出 usleep 放在stop() 尾会执行 nanosleep 使终端出现 line name
+                    usleep(100000); // 完整中断输出
                     break;
 
                 case 'restart':
@@ -272,7 +272,7 @@ class RunningMan {
 
                 case 'status';
                     $this->status();
-                    usleep(100000);
+                    usleep(100000); // 完整中断输出
                     break;
 
                 default:
@@ -316,6 +316,7 @@ class RunningMan {
             if ($pid == -1) {
                 throw new \Exception(Config\Code::$msg[Config\Code::ERR_FORK], Config\Code::ERR_FORK);
             } else if ($pid > 0) {
+                usleep(100000); // 完整终端输出
                 exit;
             }
         }
@@ -539,14 +540,14 @@ class RunningMan {
             $closeName   = str_pad('Close', 8, ' ');
             $errorName   = 'Error';
 $msg = <<<EOF
+
 ___________________________________________\33[47;30m RunningMan \33[0m__________________________________________
-Master Process：
+Summary：
  RM Version: ${rmVersion}    PHP Version: ${phpVersion}    Mode: ${mode}    EV: ${event}    Protocol: ${protocol}
  PID: ${pid}    Loadavg: ${loadavg}    RunTime: ${startTime} (${runTime})    Memory: ${memory}M
 
 Worker Process：
 \33[47;30m ${pidName}${userName}${listenName}${memoryName}${connectName}${recvName}${sendName}${closeName}${errorName} \33[0m
-
 EOF;
             $this->print($msg);
             foreach ($this->pidMap[$this->masterPid] as $pid) {
@@ -577,7 +578,6 @@ EOF;
 
 $msg = <<<EOF
  ${pid}${user}${local}${memory}${connect}${recv}${send}${close}${error}
-
 EOF;
         $this->print($msg);
     }
@@ -667,22 +667,11 @@ EOF;
             $tips = 'Press Ctrl+C to quit.';
         }
 
-        $l1 = strlen(sprintf('%s %s', $this->group, $this->user)) - strlen('User') + 1;
-        $l2 = strlen($this->localDomain) - strlen('Listen') + 2;
-
-        $f1 = 'User' . str_pad(' ', $l1);
-        $f2 = 'Listen' . str_pad(' ', $l2);
-        $f3 = 'Process';
-
 $note = <<<EOF
 
--------------------\33[47;30m RunningMan \33[0m-------------------
-RM Version [$rmVersion]      PHP Version [$phpVersion]
-MODE [$mode]  Event [$event]  Protocol [$protocol]
-Master PID [$this->masterPid]
-
-\33[47;30m ${f1} ${f2} ${f3} \33[0m
-$this->group $this->user   $this->localDomain   $this->worker
+-------------------------------------\33[47;30m RunningMan \33[0m-------------------------------------
+RM Version：$rmVersion   PHP Version：$phpVersion   MODE：$mode   Ev：$event   Protocol：$protocol
+Master PID：$this->masterPid   Group-User：$this->group-$this->user   Listen：$this->localDomain   Process：$this->worker
 
 \33[44;37;5m Start success. \33[0m  $tips
 EOF;
