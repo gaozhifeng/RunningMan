@@ -15,7 +15,7 @@ define('RM_RUNTIME', RM_ROOT . '/Runtime');
 
 
 // 自动加载
-require RM_COMMON . '/Autoload.class.php';
+require RM_COMMON . '/Autoload.php';
 
 
 // 命名空间

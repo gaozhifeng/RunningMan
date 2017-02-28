@@ -10,7 +10,8 @@
 
 namespace RunningMan\Config;
 
-class Config {
+class Config
+{
 
     const VERSION = '0.0.1';
 

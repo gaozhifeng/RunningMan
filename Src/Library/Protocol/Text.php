@@ -10,14 +10,16 @@
 
 namespace RunningMan\Library\Protocol;
 
-class Text {
+class Text
+{
 
     /**
      * 封包
      * @param  string $data 包数据
      * @return string
      */
-    public function pack($data) {
+    public function pack($data)
+    {
         return $data . "\n";
     }
 
@@ -26,7 +28,8 @@ class Text {
      * @param  string $data 包数据
      * @return mixed
      */
-    public function unPackPos($data) {
+    public function unPackPos($data)
+    {
         $ret = false;
         do {
             $pos = strpos($data, "\n");

@@ -10,7 +10,8 @@
 
 namespace RunningMan\Library\Event;
 
-class Libevent implements EventInterface {
+class Libevent implements EventInterface
+{
 
     public $event     = null;
     public $eventBase = null;
@@ -19,7 +20,8 @@ class Libevent implements EventInterface {
         $this->eventBase = event_base_new();
     }
 
-    public function add($fd, $flag, $callback) {
+    public function add($fd, $flag, $callback)
+    {
         switch ($flag) {
             case self::EV_SIGNAL:
                 $sId = (int) $fd;
@@ -50,13 +52,15 @@ class Libevent implements EventInterface {
         }
     }
 
-    public function delete($fd, $flag) {
+    public function delete($fd, $flag)
+    {
         $sId = (int) $fd;
         unset($this->event[$sId][$flag]);
         event_del($this->event[$sId][$flag]);
     }
 
-    public function loop() {
+    public function loop()
+    {
         event_base_loop($this->eventBase);
     }
 

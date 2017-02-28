@@ -10,7 +10,8 @@
 
 namespace RunningMan\Library\Event;
 
-class Select implements EventInterface {
+class Select implements EventInterface
+{
 
     /**
      * 监听事件
@@ -37,7 +38,8 @@ class Select implements EventInterface {
      * @param  string   $callback 回调
      * @return bool
      */
-    public function add($socket, $flag, $callback) {
+    public function add($socket, $flag, $callback)
+    {
         switch ($flag) {
             case self::EV_SIGNAL:
                 $sId                      = (int) $socket;
@@ -64,7 +66,8 @@ class Select implements EventInterface {
      * @param  int      $flag   事件类型
      * @return bool
      */
-    public function delete($fd, $flag) {
+    public function delete($fd, $flag)
+    {
         switch ($flag) {
             case self::EV_SIGNAL:
                 $sId = (int) $fd;
@@ -89,7 +92,8 @@ class Select implements EventInterface {
      * 轮询
      * @return void
      */
-    public function loop() {
+    public function loop()
+    {
         while (true) {
             pcntl_signal_dispatch();
 

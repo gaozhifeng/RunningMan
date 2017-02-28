@@ -2,7 +2,8 @@
 
 namespace RunningMan\Library\Connection;
 
-interface ConnectionInterface {
+interface ConnectionInterface
+{
 
     public $statistics = [
         'connection',

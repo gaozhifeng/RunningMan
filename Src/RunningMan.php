@@ -18,7 +18,8 @@ use RunningMan\Library\Protocol;
 
 require __DIR__ . '/Common/bootstrap.inc.php';
 
-class RunningMan {
+class RunningMan
+{
 
     /**
      * backlog
@@ -204,7 +205,8 @@ class RunningMan {
     /**
      * 构造器
      */
-    public function __construct($domain, $context = []) {
+    public function __construct($domain, $context = [])
+    {
         $this->pidFile = RM_RUNTIME . '/Log/RM.pid';
         $this->logFile = RM_RUNTIME . '/Log/RM.log';
         touch($this->logFile);
@@ -243,7 +245,8 @@ class RunningMan {
      * @return void
      * @throws Exception 异常
      */
-    public function run() {
+    public function run()
+    {
         try {
             // 模式检查
             $this->checkSapi();
@@ -291,7 +294,8 @@ class RunningMan {
      * 开始
      * @return void
      */
-    public function start() {
+    public function start()
+    {
         // 启动进程
         $this->startProcess();
         // 启动画面
@@ -307,7 +311,8 @@ class RunningMan {
      * @return void
      * @throws Exception 异常
      */
-    public function startProcess() {
+    public function startProcess()
+    {
         $this->status = self::STATUS_START;
         cli_set_process_title('RunningMan: master process (' . __FILE__ . ')');
         if ($this->daemon) {
@@ -336,7 +341,8 @@ class RunningMan {
      * @return void
      * @throws Exception 异常
      */
-    public function setMasterPid() {
+    public function setMasterPid()
+    {
         $this->masterPid = posix_getpid();
         Common\Util::writeFile($this->pidFile, $this->masterPid, LOCK_EX);
     }
@@ -346,7 +352,8 @@ class RunningMan {
      * @return void
      * @throws Exception 异常
      */
-    public function forkProcess() {
+    public function forkProcess()
+    {
         $pid = pcntl_fork();
         if ($pid == -1) {
             throw new \Exception(Config\Code::$msg[Config\Code::ERR_FORK], Config\Code::ERR_FORK);
@@ -380,7 +387,8 @@ class RunningMan {
      * @return void
      * @throws Exception 异常
      */
-    public function signalReg() {
+    public function signalReg()
+    {
         foreach ($this->signalList as $signal) {
             pcntl_signal($signal, function ($s) {
                 switch ($s) {
@@ -409,7 +417,8 @@ class RunningMan {
      * @param  int $signal 信号量
      * @return void
      */
-    public function signalHandler($signal) {
+    public function signalHandler($signal)
+    {
         switch ($signal) {
             case SIGINT:
                 // accept socket 关闭
@@ -433,7 +442,8 @@ class RunningMan {
      * @return void
      * @throws Exception 异常
      */
-    public function signalWatch() {
+    public function signalWatch()
+    {
         while (true) {
             pcntl_signal_dispatch();
             $status = 0;
@@ -466,7 +476,8 @@ class RunningMan {
      * @return void
      * @throws Exception 异常
      */
-    public function stop() {
+    public function stop()
+    {
         $this->status = self::STATUS_STOP;
         // ctrl c 或 signal
         if ($this->masterPid == posix_getpid()) {
@@ -485,7 +496,8 @@ class RunningMan {
      * 重启
      * @return void
      */
-    public function restart() {
+    public function restart()
+    {
         $this->status = self::STATUS_RESTART;
         $this->stop();
         usleep(200000);  // 避免rest输出到中断与子进程退出状态重合
@@ -506,7 +518,8 @@ class RunningMan {
      * 状态
      * @return void
      */
-    public function status() {
+    public function status()
+    {
         // signal
         if ($this->masterPid == posix_getpid()) {
             $rmVersion  = Config\Config::VERSION;
@@ -564,7 +577,8 @@ EOF;
      * 子进程状态
      * @return void
      */
-    public function statusSubProcess() {
+    public function statusSubProcess()
+    {
         $connect = str_pad(Connection\Tcp::$statistic['connect'], 8, ' ');
         $recv    = str_pad(Connection\Tcp::$statistic['recv'], 8, ' ');
         $send    = str_pad(Connection\Tcp::$statistic['send'], 8, ' ');
@@ -587,7 +601,8 @@ EOF;
      * @return void
      * @throws Exception 异常
      */
-    public function checkSapi() {
+    public function checkSapi()
+    {
         if (PHP_SAPI != 'cli') {
             throw new \Exception(Config\Code::$msg[Config\Code::ERR_MODE], Config\Code::ERR_MODE);
         }
@@ -603,7 +618,8 @@ EOF;
      * @return void
      * @throws Exception 异常
      */
-    public function parseDir() {
+    public function parseDir()
+    {
         global $argv;
         $dir1 = isset($argv[1]) ? $argv[1] : null;
         $dir2 = isset($argv[2]) ? $argv[2] : null;
@@ -626,7 +642,8 @@ EOF;
      * @return void
      * @throws Exception 异常
      */
-    public function checkPre() {
+    public function checkPre()
+    {
         $masterPid = 0;
         is_file($this->pidFile) and $masterPid = (int) file_get_contents($this->pidFile);
         if ($this->dir == 'start' and $masterPid and posix_kill($masterPid, 0)) {
@@ -642,7 +659,8 @@ EOF;
      * @param  string $str 字符串
      * @return void
      */
-    public function print($str) {
+    public function print($str)
+    {
         $logStr = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $str);
         Common\Util::writeFile($this->logFile, $logStr);
         echo $str . "\n";
@@ -652,7 +670,8 @@ EOF;
      * 启动屏幕
      * @return void
      */
-    public function bootScreen() {
+    public function bootScreen()
+    {
         $rmVersion  = Config\Config::VERSION;
         $phpVersion = PHP_VERSION;
 
@@ -682,7 +701,8 @@ EOF;
      * 监听
      * @return void
      */
-    public function listen() {
+    public function listen()
+    {
         list($transport) = explode('://', $this->localDomain, 2);
         $errno  = 0;
         $errmsg = '';
@@ -704,7 +724,8 @@ EOF;
      * 事件轮询
      * @return void
      */
-    public function eventLoop() {
+    public function eventLoop()
+    {
         $eventClass = __NAMESPACE__ . '\\Library\Event\\' . ucfirst($this->eventName);
         $eventIns = new $eventClass();
         $eventIns->add($this->serverSocket, Event\EventInterface::EV_READ, [$this, 'accept']);
@@ -723,7 +744,8 @@ EOF;
      * @param  object   $eventHandler 事件对象
      * @return void
      */
-    public function accept($serverSocket, $flag, $eventHandler) {
+    public function accept($serverSocket, $flag, $eventHandler)
+    {
         // 多个进程会造成惊群，没有accept 成功的进程会报错误 使用@屏蔽
         $acceptSocket = stream_socket_accept($serverSocket, 0, $remoteClient);
         if ($acceptSocket) {

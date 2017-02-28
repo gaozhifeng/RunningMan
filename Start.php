@@ -10,16 +10,18 @@
 
 use RunningMan\RunningMan;
 
-require __DIR__ . '/Src/RunningMan.class.php';
+require __DIR__ . '/Src/RunningMan.php';
 
-class Start {
+class Start
+{
 
     /**
      * 运行
      * @param  RunningMan $rm RM实例
      * @return void
      */
-    public static function run(RunningMan $rm) {
+    public static function run(RunningMan $rm)
+    {
         $rm->run();
     }
 }

@@ -10,7 +10,8 @@
 
 namespace RunningMan\Common;
 
-class Util {
+class Util
+{
 
     /**
      * 写文件

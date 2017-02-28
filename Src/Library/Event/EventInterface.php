@@ -10,7 +10,8 @@
 
 namespace RunningMan\Library\Event;
 
-interface EventInterface {
+interface EventInterface
+{
 
     const EV_READ = 1;
 

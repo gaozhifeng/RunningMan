@@ -13,7 +13,8 @@ namespace RunningMan\Library\Connection;
 use RunningMan\Config;
 use RunningMan\Library\Event;
 
-class Tcp {
+class Tcp
+{
 
     /**
      * 读取buffer
@@ -96,7 +97,8 @@ class Tcp {
      * 接收连接
      * @return void
      */
-    public function accept() {
+    public function accept()
+    {
         ++ self::$statistic['connect'] ;
 
         stream_set_blocking($this->acceptSocket, 0); // 非阻塞
@@ -113,7 +115,8 @@ class Tcp {
      * @param  resource $acceptSocket 接收Socket
      * @return void
      */
-    public function read($acceptSocket) {
+    public function read($acceptSocket)
+    {
         // STREAM_PEEK 会导致 stream_select 不断循环
         $this->recvBuffer .= stream_socket_recvfrom($acceptSocket, self::READ_BUFFER_SIZE);
         $flag = true;
@@ -150,7 +153,8 @@ class Tcp {
      * @param  string $data 数据
      * @return void
      */
-    public function write($data) {
+    public function write($data)
+    {
         ++ self::$statistic['send'];
 
         $ret = true;
@@ -185,7 +189,8 @@ class Tcp {
      * 关闭连接
      * @return void
      */
-    public function close() {
+    public function close()
+    {
         ++ self::$statistic['close'];
 
         // 关闭连接
