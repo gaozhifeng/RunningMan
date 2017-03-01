@@ -12,7 +12,6 @@ namespace RunningMan\Library\Protocol;
 
 class Text
 {
-
     /**
      * 封包
      * @param  string $data 包数据
@@ -42,5 +41,4 @@ class Text
 
         return $ret;
     }
-
 }

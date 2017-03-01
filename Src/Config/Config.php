@@ -12,9 +12,13 @@ namespace RunningMan\Config;
 
 class Config
 {
-
+    /**
+     * 版本
+     */
     const VERSION = '0.0.1';
 
+    /**
+     * 调试
+     */
     const DEBUG = false;
-
 }

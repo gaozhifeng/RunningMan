@@ -12,10 +12,9 @@ namespace RunningMan\Common;
 
 class Autoload
 {
-
     /**
      * 运行
-     * @param  boolean $enabled 加载
+     * @param  boolean $enabled 应用
      * @return void
      */
     public static function run($enabled = true)
@@ -41,7 +40,7 @@ class Autoload
             'RunningMan' => RM_ROOT,
         ];
 
-        list($namespace) = explode('/', $classPath);
+        list($namespace) = explode('/', $classPath, 2);
         if (array_key_exists($namespace, $namespaceMap)) {
             $classFile = str_replace($namespace, $namespaceMap[$namespace], $classFile);
         }

@@ -12,14 +12,24 @@ namespace RunningMan\Library\Event;
 
 class Libevent implements EventInterface
 {
-
     public $event     = null;
     public $eventBase = null;
 
-    public function __construct() {
+    /**
+     * 构造器
+     */
+    public function __construct()
+    {
         $this->eventBase = event_base_new();
     }
 
+    /**
+     * 添加事件
+     * @param  resource $socket   监听socket
+     * @param  int      $flag     事件类型
+     * @param  string   $callback 回调
+     * @return bool
+     */
     public function add($fd, $flag, $callback)
     {
         switch ($flag) {
@@ -52,6 +62,12 @@ class Libevent implements EventInterface
         }
     }
 
+    /**
+     * 删除事件
+     * @param  resource $fd   监听socket
+     * @param  int      $flag 事件类型
+     * @return bool
+     */
     public function delete($fd, $flag)
     {
         $sId = (int) $fd;
@@ -59,6 +75,10 @@ class Libevent implements EventInterface
         event_del($this->event[$sId][$flag]);
     }
 
+    /**
+     * 轮询
+     * @return void
+     */
     public function loop()
     {
         event_base_loop($this->eventBase);

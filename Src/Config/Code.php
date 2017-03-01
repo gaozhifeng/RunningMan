@@ -12,7 +12,6 @@ namespace RunningMan\Config;
 
 class Code
 {
-
     const ERR_SYSTEM    = 1001;
     const ERR_MODE      = 1002;
     const ERR_EXTENSION = 1003;

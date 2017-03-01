@@ -12,7 +12,6 @@ namespace RunningMan\Library\Event;
 
 class Select implements EventInterface
 {
-
     /**
      * 监听事件
      * @var array
@@ -62,8 +61,8 @@ class Select implements EventInterface
 
     /**
      * 删除事件
-     * @param  resource $fd 监听socket
-     * @param  int      $flag   事件类型
+     * @param  resource $fd   监听socket
+     * @param  int      $flag 事件类型
      * @return bool
      */
     public function delete($fd, $flag)

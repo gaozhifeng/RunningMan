@@ -15,7 +15,6 @@ use RunningMan\Library\Event;
 
 class Tcp
 {
-
     /**
      * 读取buffer
      */
