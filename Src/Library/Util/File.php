@@ -8,9 +8,9 @@
  * @copyright    © RunningMan
  */
 
-namespace RunningMan\Common;
+namespace RunningMan\Library\Util;
 
-class Util
+class File
 {
     /**
      * 写文件

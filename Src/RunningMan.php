@@ -15,6 +15,7 @@ use RunningMan\Config;
 use RunningMan\Library\Event;
 use RunningMan\Library\Connection;
 use RunningMan\Library\Protocol;
+use RunningMan\Library\Util;
 
 require __DIR__ . '/Common/bootstrap.inc.php';
 
@@ -242,6 +243,9 @@ class RunningMan
         $this->onSend    = function () {};
         $this->onClose   = function () {};
         $this->onError   = function () {};
+
+        // 定时器初始化
+        Util\Timer::init();
     }
 
     /**
@@ -349,7 +353,7 @@ class RunningMan
     public function setMasterPid()
     {
         $this->masterPid = posix_getpid();
-        Common\Util::writeFile($this->pidFile, $this->masterPid, LOCK_EX);
+        Util\File::writeFile($this->pidFile, $this->masterPid, LOCK_EX);
     }
 
     /**
@@ -676,7 +680,7 @@ EOF;
     public function print($str)
     {
         $logStr = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $str);
-        Common\Util::writeFile($this->logFile, $logStr);
+        Util\File::writeFile($this->logFile, $logStr);
         echo $str . "\n";
     }
 
