@@ -163,7 +163,7 @@ class RunningMan
 
     /**
      * 服务器Socket
-     * @var stream
+     * @var resource
      */
     public $serverSocket = null;
 
@@ -251,7 +251,7 @@ class RunningMan
     /**
      * 运行
      * @return void
-     * @throws Exception 异常
+     * @throws \Exception 异常
      */
     public function run()
     {
@@ -276,6 +276,7 @@ class RunningMan
 
                 case 'restart':
                     $this->restart();
+                    break;
 
                 case 'reload':
                     $this->reload();
@@ -318,7 +319,7 @@ class RunningMan
     /**
      * 启动进程
      * @return void
-     * @throws Exception 异常
+     * @throws \Exception 异常
      */
     public function startProcess()
     {
@@ -329,14 +330,16 @@ class RunningMan
             $pid = pcntl_fork();
             if ($pid == -1) {
                 throw new \Exception(Config\Code::$msg[Config\Code::ERR_FORK], Config\Code::ERR_FORK);
-            } else if ($pid > 0) {
+            } else if ($pid > 0) { // 当前进程退出，子进程作为 daemon master 继续运行
                 usleep(100000); // 完整终端输出
                 exit;
             }
         }
 
+        // 更新主进程Id
         $this->setMasterPid();
 
+        // 监听端口请求
         $this->listen();
 
         // Fork 子进程
@@ -348,7 +351,7 @@ class RunningMan
     /**
      * 设置主进程Id
      * @return void
-     * @throws Exception 异常
+     * @throws \Exception 异常
      */
     public function setMasterPid()
     {
@@ -359,7 +362,7 @@ class RunningMan
     /**
      * Fork进程
      * @return void
-     * @throws Exception 异常
+     * @throws \Exception 异常
      */
     public function forkProcess()
     {
@@ -394,7 +397,7 @@ class RunningMan
     /**
      * 信号注册
      * @return void
-     * @throws Exception 异常
+     * @throws \Exception 异常
      */
     public function signalReg()
     {
@@ -446,7 +449,7 @@ class RunningMan
     /**
      * 信号看守
      * @return void
-     * @throws Exception 异常
+     * @throws \Exception 异常
      */
     public function signalWatch()
     {
@@ -480,7 +483,7 @@ class RunningMan
     /**
      * 停止进程
      * @return void
-     * @throws Exception 异常
+     * @throws \Exception 异常
      */
     public function stop()
     {
@@ -617,7 +620,7 @@ EOF;
     /**
      * 检查运行模式
      * @return void
-     * @throws Exception 异常
+     * @throws \Exception 异常
      */
     public function checkSapi()
     {
@@ -634,7 +637,7 @@ EOF;
     /**
      * 解析指令
      * @return void
-     * @throws Exception 异常
+     * @throws \Exception 异常
      */
     public function parseDir()
     {
@@ -643,7 +646,7 @@ EOF;
         $dir2 = isset($argv[2]) ? $argv[2] : null;
 
         if (!in_array($dir1, $this->dirList)) {
-            $exceMsg = sprintf('Usage: php %s {%s}', $argv[0], implode('|', $this->dirList));
+            $exceMsg = sprintf('Usage: php %s {%s} [-d]', $argv[0], implode('|', $this->dirList));
             throw new \Exception($exceMsg, Config\Code::ERR_DIRECTIVE);
         }
 
@@ -658,7 +661,7 @@ EOF;
     /**
      * 前置检查
      * @return void
-     * @throws Exception 异常
+     * @throws \Exception 异常
      */
     public function checkPre()
     {

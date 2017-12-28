@@ -14,7 +14,6 @@ require __DIR__ . '/Src/RunningMan.php';
 
 class Start
 {
-
     /**
      * 运行
      * @param  RunningMan $rm RM实例

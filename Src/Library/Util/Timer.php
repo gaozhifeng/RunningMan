@@ -58,7 +58,7 @@ class Timer
      */
     public static function delete($taskName)
     {
-        unset($taskList[$taskName]);
+        unset(self::$task[$taskName]);
     }
 
     /**
