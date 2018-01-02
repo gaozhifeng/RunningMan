@@ -48,6 +48,11 @@ class RunningMan
     const STATUS_RELOAD = 8;
 
     /**
+     * 消息类型(status)
+     */
+    const MSG_QUEUE_TYPE_STATUS = 1;
+
+    /**
      * 守护进程
      * @var boolean
      */
@@ -150,6 +155,12 @@ class RunningMan
     public $logFile = '';
 
     /**
+     * 消息队列
+     * @var null
+     */
+    public $msgQueue = null;
+
+    /**
      * 监听地址
      * @var string
      */
@@ -243,6 +254,10 @@ class RunningMan
         $this->onSend    = function () {};
         $this->onClose   = function () {};
         $this->onError   = function () {};
+
+        // 消息队列初始化
+        $msgId          = ftok(__FILE__, 'status');
+        $this->msgQueue = msg_get_queue($msgId);
 
         // 定时器初始化
         Util\Timer::init();
@@ -583,10 +598,13 @@ Summary：
 Worker Process：
 \33[47;30m ${pidName}${userName}${listenName}${memoryName}${connectName}${recvName}${sendName}${closeName}${errorName} \33[0m
 EOF;
-            $this->print($msg);
             foreach ($this->pidMap[$this->masterPid] as $pid) {
                 posix_kill($pid, SIGUSR2);
+                msg_receive($this->msgQueue, self::MSG_QUEUE_TYPE_STATUS, $msgType,1024, $message);
+                $msg .= sprintf("\n%s", $message);
             }
+
+            $this->print($msg);
         } else {
             $pid = file_get_contents($this->pidFile);
             $pid and posix_kill($pid, SIGUSR2);
@@ -614,7 +632,7 @@ EOF;
 $msg = <<<EOF
  ${pid}${user}${local}${memory}${connect}${recv}${send}${close}${error}
 EOF;
-        $this->print($msg);
+        msg_send($this->msgQueue, self::MSG_QUEUE_TYPE_STATUS, $msg);
     }
 
     /**
