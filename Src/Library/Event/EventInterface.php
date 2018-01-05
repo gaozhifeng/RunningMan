@@ -20,5 +20,7 @@ interface EventInterface
 
     public function add($socket, $flag, $callback);
 
+    public function delete($fd, $flag);
+
     public function loop();
 }

@@ -22,12 +22,15 @@ class Timer
      * 初始化
      * @return void
      */
-    public static function init()
+    public static function init($event = false)
     {
-        pcntl_signal(SIGALRM, function($s) {
-            pcntl_alarm(1);
-            self::runTask();
-        }, false);
+        if (!$event) {
+            pcntl_signal(SIGALRM, function () {
+                // 每次对 pcntl_alarm() 的调用都会取消之前设置的alarm信号，重新设置
+                pcntl_alarm(1);
+                self::runTask();
+            }, false);
+        }
     }
 
     /**
@@ -71,6 +74,8 @@ class Timer
             if (empty(self::$task)) {
                 pcntl_alarm(0);
                 break;
+            } else {
+                pcntl_alarm(1);
             }
 
             foreach (self::$task as $taskName => &$task) {
@@ -83,7 +88,7 @@ class Timer
                 }
 
                 list($callFunc, $callArgs) = $task['callback'];
-                call_user_func_array($callFunc, $callArgs);
+                call_user_func($callFunc, $callArgs);
 
                 $task['runtime'] = time();
             }

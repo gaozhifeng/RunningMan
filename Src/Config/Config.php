@@ -15,7 +15,7 @@ class Config
     /**
      * 版本
      */
-    const VERSION = '0.0.1';
+    const VERSION = '0.0.3';
 
     /**
      * 调试

@@ -10,11 +10,9 @@
 
 namespace RunningMan;
 
-use RunningMan\Common;
 use RunningMan\Config;
 use RunningMan\Library\Event;
 use RunningMan\Library\Connection;
-use RunningMan\Library\Protocol;
 use RunningMan\Library\Util;
 
 require __DIR__ . '/Common/bootstrap.inc.php';
@@ -122,7 +120,7 @@ class RunningMan
      * 信号列表
      * @var array
      */
-    private $signalList = [SIGINT, SIGUSR1, SIGUSR2];
+    private $signalList = [SIGINT, SIGALRM, SIGUSR1, SIGUSR2];
 
     /**
      * 运行状态
@@ -209,6 +207,18 @@ class RunningMan
     public $onError = null;
 
     /**
+     * 不活跃保持时间
+     * @var int
+     */
+    public $keepalived = 60;
+
+    /**
+     * socket 列表
+     * @var array
+     */
+    public $connections = [];
+
+    /**
      * 全局统计
      * @var array
      */
@@ -216,6 +226,9 @@ class RunningMan
 
     /**
      * 构造器
+     * @param string $domain  监听地址
+     * @param array  $context 上下文选项
+     * @throws \Exception 交换协议不支持
      */
     public function __construct($domain, $context = [])
     {
@@ -245,6 +258,7 @@ class RunningMan
         foreach ($this->eventList as $ev) {
             if (extension_loaded($ev)) {
                 $this->eventName = $ev;
+                break;
             }
         }
 
@@ -307,9 +321,9 @@ class RunningMan
                     break;
             }
         } catch (\Exception $e) {
-            $this->print(sprintf('Exception [%s] %s %s:%s', $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()));
+            $this->printScreen(sprintf('Exception [%s] %s %s:%s', $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()));
         } catch (\Error $e) {
-            $this->print(sprintf('Error [%s] %s %s:%s', $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()));
+            $this->printScreen(sprintf('Error [%s] %s %s:%s', $e->getCode(), $e->getMessage(), $e->getFile(), $e->getLine()));
         } finally {
         }
         exit;
@@ -326,7 +340,7 @@ class RunningMan
         // 启动画面
         $this->bootScreen();
         // 信号注册
-        $this->signalReg();
+        $this->masterSignalProcessor();
         // 信号监听
         $this->signalWatch();
     }
@@ -403,9 +417,24 @@ class RunningMan
                 posix_setgid($group['gid']);
             }
 
+            // 定时器初始化
+            Util\Timer::init(true);
+
+            // 心跳检测
+            Util\Timer::add('keepalived', [function () {
+                $time = time();
+                foreach ($this->connections as $connection) {
+                    // 不活跃连接管理
+                    if ($time - $connection->activeTime >= $this->keepalived) {
+                        $connection->close();
+                        unset($this->connections[spl_object_hash($connection)]);
+                    }
+                }
+            }, null], true, 1);
+
             // 事件处理
             $this->eventLoop();
-            exit; // 无 exit 会导致子进程运行只有主进程的方法
+            exit; // 无 exit 会导致子进程运行主进程的方法
         }
     }
 
@@ -414,13 +443,17 @@ class RunningMan
      * @return void
      * @throws \Exception 异常
      */
-    public function signalReg()
+    public function masterSignalProcessor()
     {
         foreach ($this->signalList as $signal) {
             pcntl_signal($signal, function ($s) {
                 switch ($s) {
                     case SIGINT:
                         $this->stop();
+                        break;
+
+                    case SIGALRM:
+                        Util\Timer::runTask();
                         break;
 
                     case SIGUSR1:
@@ -434,8 +467,9 @@ class RunningMan
                     default:
                         break;
                 }
-            }, false); // 这个 false 很重要，会影响主进程信号执行
-                       // 不是 false 主进程接收到信号但无反应
+            }, false); // 收到信号，系统调用不从开始处开始处理
+                                     // 这个 false 很重要，会影响主进程信号执行
+                                     // 不是 false 主进程接收到信号但无反应
         }
     }
 
@@ -444,16 +478,21 @@ class RunningMan
      * @param  int $signal 信号量
      * @return void
      */
-    public function signalHandler($signal)
+    public function workerSignalProcessor($signal)
     {
         switch ($signal) {
-            case SIGINT:
-            case SIGUSR1:
-                // accept socket 关闭
+            case SIGINT:  // stop
                 exit;
 
-            case SIGUSR2:
-                $this->statusSubProcess();
+            case SIGALRM:
+                Util\Timer::runTask();
+                break;
+
+            case SIGUSR1: // reload
+                exit;
+
+            case SIGUSR2: // status
+                $this->statusWorkerProcess();
                 break;
 
             default:
@@ -471,10 +510,10 @@ class RunningMan
         while (true) {
             pcntl_signal_dispatch();
             $status = 0;
-            $pid = pcntl_wait($status); // 非 wait3 第二个参数无效
-            pcntl_signal_dispatch(); // pcntl_signal(, , false);   没有这个代码，发送 sigint 信号的时候，只有主进程退出
+            $pid = pcntl_wait($status); // 避免子进程僵死; 非 wait3 第二个参数无效
+            pcntl_signal_dispatch();    // pcntl_signal(, , false);   没有这个代码，发送 sigint 信号的时候，只有主进程退出
             if ($pid > 0) {
-                $this->print("Worker process [$pid] exit with status [$status]");
+                $this->printScreen("Worker process [$pid] exit with status [$status]");
                 unset($this->pidMap[$this->masterPid][array_search($pid, $this->pidMap[$this->masterPid])]);
 
                 // 非正常退出
@@ -484,7 +523,7 @@ class RunningMan
                     if (count($this->pidMap[$this->masterPid]) === 0) {
                         fclose($this->serverSocket);
                         unlink($this->pidFile);
-                        $this->print("\33[42;37;5m Stop success. \33[0m");
+                        $this->printScreen("\33[42;37;5m Stop success. \33[0m");
                         exit;
                     }
                 }
@@ -505,7 +544,7 @@ class RunningMan
         $this->status = self::STATUS_STOP;
         // ctrl c 或 signal
         if ($this->masterPid == posix_getpid()) {
-            $this->print('Stopping...');
+            $this->printScreen('Stopping...');
             foreach ($this->pidMap[$this->masterPid] as $pid) {
                 posix_kill($pid, SIGINT);
             }
@@ -524,8 +563,8 @@ class RunningMan
     {
         $this->status = self::STATUS_RESTART;
         $this->stop();
-        usleep(200000);  // 避免rest输出到中断与子进程退出状态重合
-        $this->print('Restarting...');
+        usleep(200000);  // 避免rest输出到终端与子进程退出状态重合
+        $this->printScreen('Restarting...');
         usleep(600000);  // 避免server socket 未释放完成
         $this->start();
     }
@@ -539,7 +578,7 @@ class RunningMan
         $this->status = self::STATUS_RELOAD;
         // ctrl c 或 signal
         if ($this->masterPid == posix_getpid()) {
-            $this->print('Reloading...');
+            $this->printScreen('Reloading...');
             foreach ($this->pidMap[$this->masterPid] as $pid) {
                 posix_kill($pid, SIGUSR1);
             }
@@ -604,7 +643,7 @@ EOF;
                 $msg .= sprintf("\n%s", $message);
             }
 
-            $this->print($msg);
+            $this->printScreen($msg);
         } else {
             $pid = file_get_contents($this->pidFile);
             $pid and posix_kill($pid, SIGUSR2);
@@ -616,7 +655,7 @@ EOF;
      * 子进程状态
      * @return void
      */
-    public function statusSubProcess()
+    public function statusWorkerProcess()
     {
         $connect = str_pad(Connection\Tcp::$statistic['connect'], 8, ' ');
         $recv    = str_pad(Connection\Tcp::$statistic['recv'], 8, ' ');
@@ -694,11 +733,11 @@ EOF;
     }
 
     /**
-     * 打印
+     * 打印屏幕
      * @param  string $str 字符串
      * @return void
      */
-    public function print($str)
+    public function printScreen($str)
     {
         $logStr = sprintf("[%s] %s\n", date('Y-m-d H:i:s'), $str);
         Util\File::writeFile($this->logFile, $logStr);
@@ -733,12 +772,13 @@ Master PID：$this->masterPid   Group-User：$this->group-$this->user   Listen�
 
 \33[44;37;5m Start success. \33[0m  $tips
 EOF;
-        $this->print($note);
+        $this->printScreen($note);
     }
 
     /**
      * 监听
      * @return void
+     * @throws \Exception 创建 socket 失败
      */
     public function listen()
     {
@@ -766,13 +806,15 @@ EOF;
     public function eventLoop()
     {
         $eventClass = __NAMESPACE__ . '\\Library\Event\\' . ucfirst($this->eventName);
-        $eventIns = new $eventClass();
+        $eventIns   = new $eventClass();
+
+        // 接收事件
         $eventIns->add($this->serverSocket, Event\EventInterface::EV_READ, [$this, 'accept']);
 
         // 注册子进程信号处理
         foreach ($this->signalList as $signal) {
             pcntl_signal($signal, SIG_IGN, false);
-            $eventIns->add($signal, Event\EventInterface::EV_SIGNAL, [$this, 'signalHandler']);
+            $eventIns->add($signal, Event\EventInterface::EV_SIGNAL, [$this, 'workerSignalProcessor']);
         }
         $eventIns->loop();
     }
@@ -785,7 +827,6 @@ EOF;
      */
     public function accept($serverSocket, $flag, $eventHandler)
     {
-        // 多个进程会造成惊群，没有accept 成功的进程会报错误 使用@屏蔽
         $acceptSocket = stream_socket_accept($serverSocket, 0, $remoteClient);
         if ($acceptSocket) {
             $tcpIns = new Connection\Tcp();
@@ -799,6 +840,9 @@ EOF;
             $tcpIns->onClose      = $this->onClose;
             $tcpIns->onError      = $this->onError;
             $tcpIns->accept();
+
+            // 加入 socket 列表
+            $this->connections[spl_object_hash($tcpIns)] = $tcpIns;
         }
     }
 

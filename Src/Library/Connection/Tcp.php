@@ -10,7 +10,6 @@
 
 namespace RunningMan\Library\Connection;
 
-use RunningMan\Config;
 use RunningMan\Library\Event;
 
 class Tcp
@@ -81,6 +80,12 @@ class Tcp
     public $onError = null;
 
     /**
+     * 最后活跃时间
+     * @var int
+     */
+    public $activeTime = 0;
+
+    /**
      * 统计
      * @var array
      */
@@ -98,7 +103,10 @@ class Tcp
      */
     public function accept()
     {
-        ++ self::$statistic['connect'] ;
+        ++ self::$statistic['connect'];
+
+        // 更新活跃时间
+        $this->activeTime = time();
 
         stream_set_blocking($this->acceptSocket, 0); // 非阻塞
 
@@ -116,6 +124,9 @@ class Tcp
      */
     public function read($acceptSocket)
     {
+        // 更新活跃时间
+        $this->activeTime = time();
+
         // STREAM_PEEK 会导致 stream_select 不断循环
         $this->recvBuffer .= stream_socket_recvfrom($acceptSocket, self::READ_BUFFER_SIZE);
         $flag = true;
@@ -139,7 +150,6 @@ class Tcp
                 // 执行回调
                 $this->onRecv and call_user_func($this->onRecv, $this, $recvPack);
             } else {
-                $flag = false;
                 break;
             }
         }
@@ -150,7 +160,7 @@ class Tcp
     /**
      * 写入数据
      * @param  string $data 数据
-     * @return void
+     * @return bool
      */
     public function write($data)
     {
