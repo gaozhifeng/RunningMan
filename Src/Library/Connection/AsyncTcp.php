@@ -29,6 +29,12 @@ class AsyncTcp extends TcpBase
     public $context = [];
 
     /**
+     * 心跳包频率 单位s
+     * @var int
+     */
+    public $heartbeatInterval = 3;
+
+    /**
      * 构造器
      * @param $domain
      * @param array $context
@@ -63,7 +69,7 @@ class AsyncTcp extends TcpBase
         // 心跳检测
         Util\Timer::add('heartbeat', [function () {
             $this->write('ping');
-        }, null], true, 3);
+        }, null], true, $this->heartbeatInterval);
     }
 
     /**

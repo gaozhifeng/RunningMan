@@ -219,13 +219,13 @@ class RunningMan
     public $keepalived = 60;
 
     /**
-     * 心跳请求
+     * 心跳包请求
      * @var string
      */
     public $ping = 'ping';
 
     /**
-     * 心跳响应
+     * 心跳包响应
      * @var string
      */
     public $pong = 'pong';
@@ -244,8 +244,12 @@ class RunningMan
      */
     public function __construct($domain, $context = [])
     {
-        $this->pidFile = RM_RUNTIME . '/Log/RM.pid';
-        $this->logFile = RM_RUNTIME . '/Log/RM.log';
+        // 运行文件
+        $logDir        = sprintf('%s/Log', RM_RUNTIME);
+        $this->pidFile = $logDir . '/RM.pid';
+        $this->logFile = $logDir . '/RM.log';
+        Util\File::makeDirs($logDir);
+
         touch($this->logFile);
         chmod($this->logFile, 0622);
 

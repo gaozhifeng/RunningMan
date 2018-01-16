@@ -86,13 +86,13 @@ class TcpBase implements ConnectionInterface
     public $activeTime = 0;
 
     /**
-     * 心跳请求
+     * 心跳包请求
      * @var string
      */
     public $ping = 'ping';
 
     /**
-     * 心跳响应
+     * 心跳包响应
      * @var string
      */
     public $pong = 'pong';
