@@ -186,7 +186,7 @@ class RunningMan
      * 消息回调
      * @var object
      */
-    public $onRecv = null;
+    public $onReceive = null;
 
     /**
      * 发送回调
@@ -207,16 +207,28 @@ class RunningMan
     public $onError = null;
 
     /**
+     * socket 列表
+     * @var array
+     */
+    public $connections = [];
+
+    /**
      * 不活跃保持时间
      * @var int
      */
     public $keepalived = 60;
 
     /**
-     * socket 列表
-     * @var array
+     * 心跳请求
+     * @var string
      */
-    public $connections = [];
+    public $ping = 'ping';
+
+    /**
+     * 心跳响应
+     * @var string
+     */
+    public $pong = 'pong';
 
     /**
      * 全局统计
@@ -226,8 +238,8 @@ class RunningMan
 
     /**
      * 构造器
-     * @param string $domain  监听地址
-     * @param array  $context 上下文选项
+     * @param string $domain 监听地址
+     * @param array $context 上下文选项
      * @throws \Exception 交换协议不支持
      */
     public function __construct($domain, $context = [])
@@ -244,14 +256,14 @@ class RunningMan
 
         // 流上下文
         $streamContext['socket']['backlog'] = self::BACKLOG;
-        $streamContext = array_merge($streamContext, $context); // 注意顺序，后面覆盖前面
-        $this->streamContext = stream_context_create($streamContext);
+        $streamContext                      = array_merge($streamContext, $context); // 注意顺序，后面覆盖前面
+        $this->streamContext                = stream_context_create($streamContext);
 
         // 交换协议
         if (!in_array($this->protocolName, $this->protocolList)) {
             throw new \Exception(Config\Code::$msg[Config\Code::ERR_PROTOCOL], Config\Code::ERR_PROTOCOL);
         }
-        $protocolClass = __NAMESPACE__ . '\\Library\\Protocol\\' . ucfirst($this->protocolName);
+        $protocolClass  = __NAMESPACE__ . '\\Library\\Protocol\\' . ucfirst($this->protocolName);
         $this->protocol = new $protocolClass();
 
         // 事件驱动
@@ -263,14 +275,19 @@ class RunningMan
         }
 
         // 回调初始化
-        $this->onConnect = function () {};
-        $this->onRecv    = function () {};
-        $this->onSend    = function () {};
-        $this->onClose   = function () {};
-        $this->onError   = function () {};
+        $this->onConnect = function () {
+        };
+        $this->onReceive = function () {
+        };
+        $this->onSend    = function () {
+        };
+        $this->onClose   = function () {
+        };
+        $this->onError   = function () {
+        };
 
         // 消息队列初始化
-        $msgId          = ftok(__FILE__, 'status');
+        $msgId          = ftok(__FILE__, 's');
         $this->msgQueue = msg_get_queue($msgId);
 
         // 定时器初始化
@@ -357,7 +374,7 @@ class RunningMan
         if ($this->daemon) {
             umask(0);
             $pid = pcntl_fork();
-            if ($pid == -1) {
+            if ($pid == - 1) {
                 throw new \Exception(Config\Code::$msg[Config\Code::ERR_FORK], Config\Code::ERR_FORK);
             } else if ($pid > 0) { // 当前进程退出，子进程作为 daemon master 继续运行
                 usleep(100000); // 完整终端输出
@@ -396,7 +413,7 @@ class RunningMan
     public function forkProcess()
     {
         $pid = pcntl_fork();
-        if ($pid == -1) {
+        if ($pid == - 1) {
             throw new \Exception(Config\Code::$msg[Config\Code::ERR_FORK], Config\Code::ERR_FORK);
         } else if ($pid > 0) {
             $this->pidMap[$this->masterPid][] = $pid;
@@ -421,16 +438,18 @@ class RunningMan
             Util\Timer::init(true);
 
             // 心跳检测
-            Util\Timer::add('keepalived', [function () {
-                $time = time();
-                foreach ($this->connections as $connection) {
-                    // 不活跃连接管理
-                    if ($time - $connection->activeTime >= $this->keepalived) {
-                        $connection->close();
-                        unset($this->connections[spl_object_hash($connection)]);
+            if ($this->keepalived > 0) {
+                Util\Timer::add('keepalived', [function () {
+                    $time = time();
+                    foreach ($this->connections as $connection) {
+                        // 不活跃连接管理
+                        if ($time - $connection->activeTime >= $this->keepalived) {
+                            $connection->close();
+                            unset($this->connections[spl_object_hash($connection)]);
+                        }
                     }
-                }
-            }, null], true, 1);
+                }, null], true, 1);
+            }
 
             // 事件处理
             $this->eventLoop();
@@ -468,8 +487,8 @@ class RunningMan
                         break;
                 }
             }, false); // 收到信号，系统调用不从开始处开始处理
-                                     // 这个 false 很重要，会影响主进程信号执行
-                                     // 不是 false 主进程接收到信号但无反应
+            // 这个 false 很重要，会影响主进程信号执行
+            // 不是 false 主进程接收到信号但无反应
         }
     }
 
@@ -510,7 +529,7 @@ class RunningMan
         while (true) {
             pcntl_signal_dispatch();
             $status = 0;
-            $pid = pcntl_wait($status); // 避免子进程僵死; 非 wait3 第二个参数无效
+            $pid    = pcntl_wait($status); // 避免子进程僵死; 非 wait3 第二个参数无效
             pcntl_signal_dispatch();    // pcntl_signal(, , false);   没有这个代码，发送 sigint 信号的时候，只有主进程退出
             if ($pid > 0) {
                 $this->printScreen("Worker process [$pid] exit with status [$status]");
@@ -618,28 +637,29 @@ class RunningMan
             $runSecond = intval($runTime % 86400 % 3600 % 60);
             $runTime   = sprintf('%d天%d时%d分%d秒', $runDay, $runHour, $runMinute, $runSecond);
 
-            $pidName     = str_pad('PID', 10, ' ');
-            $userName    = str_pad('Group-User', 14, ' ');
-            $listenName  = str_pad('Listen', 24, ' ');
-            $memoryName  = str_pad('Memory', 10, ' ');
-            $connectName = str_pad('Conn', 8, ' ');
-            $recvName    = str_pad('Recv', 8, ' ');
-            $sendName    = str_pad('Send', 8, ' ');
-            $closeName   = str_pad('Close', 8, ' ');
-            $errorName   = 'Error';
-$msg = <<<EOF
+            $pidName       = str_pad('PID', 10, ' ');
+            $userName      = str_pad('Group-User', 14, ' ');
+            $listenName    = str_pad('Listen', 24, ' ');
+            $memoryName    = str_pad('Memory', 10, ' ');
+            $connectName   = str_pad('Conn', 8, ' ');
+            $recvName      = str_pad('Recv', 8, ' ');
+            $heartbeatName = str_pad('Heart', 8, ' ');
+            $sendName      = str_pad('Send', 8, ' ');
+            $closeName     = str_pad('Close', 8, ' ');
+            $errorName     = 'Error';
+            $msg           = <<<EOF
 
-___________________________________________\33[47;30m RunningMan \33[0m__________________________________________
+_______________________________________________\33[47;30m RunningMan \33[0m______________________________________________
 Summary：
  RM Version: ${rmVersion}    PHP Version: ${phpVersion}    Mode: ${mode}    EV: ${event}    Protocol: ${protocol}
  PID: ${pid}    Loadavg: ${loadavg}    RunTime: ${startTime} (${runTime})    Memory: ${memory}M
 
 Worker Process：
-\33[47;30m ${pidName}${userName}${listenName}${memoryName}${connectName}${recvName}${sendName}${closeName}${errorName} \33[0m
+\33[47;30m ${pidName}${userName}${listenName}${memoryName}${connectName}${recvName}${heartbeatName}${sendName}${closeName}${errorName} \33[0m
 EOF;
             foreach ($this->pidMap[$this->masterPid] as $pid) {
                 posix_kill($pid, SIGUSR2);
-                msg_receive($this->msgQueue, self::MSG_QUEUE_TYPE_STATUS, $msgType,1024, $message);
+                msg_receive($this->msgQueue, self::MSG_QUEUE_TYPE_STATUS, $msgType, 1024, $message);
                 $msg .= sprintf("\n%s", $message);
             }
 
@@ -657,19 +677,20 @@ EOF;
      */
     public function statusWorkerProcess()
     {
-        $connect = str_pad(Connection\Tcp::$statistic['connect'], 8, ' ');
-        $recv    = str_pad(Connection\Tcp::$statistic['recv'], 8, ' ');
-        $send    = str_pad(Connection\Tcp::$statistic['send'], 8, ' ');
-        $close   = str_pad(Connection\Tcp::$statistic['close'], 8, ' ');
-        $error   = Connection\Tcp::$statistic['error'];
+        $connect   = str_pad(Connection\Tcp::$statistic['connect'], 8, ' ');
+        $recv      = str_pad(Connection\Tcp::$statistic['receive'], 8, ' ');
+        $heartbeat = str_pad(Connection\Tcp::$statistic['heartbeat'], 8, ' ');
+        $send      = str_pad(Connection\Tcp::$statistic['send'], 8, ' ');
+        $close     = str_pad(Connection\Tcp::$statistic['close'], 8, ' ');
+        $error     = Connection\Tcp::$statistic['error'];
 
         $pid    = str_pad(posix_getpid(), 10, ' ');
         $user   = str_pad(sprintf('%s %s', $this->group, $this->user), 14, ' ');
         $local  = str_pad($this->localDomain, 24, ' ');
         $memory = str_pad(round(memory_get_usage(true) / 1024 / 1024, 2) . 'M', 10, ' ');
 
-$msg = <<<EOF
- ${pid}${user}${local}${memory}${connect}${recv}${send}${close}${error}
+        $msg = <<<EOF
+ ${pid}${user}${local}${memory}${connect}${recv}${heartbeat}${send}${close}${error}
 EOF;
         msg_send($this->msgQueue, self::MSG_QUEUE_TYPE_STATUS, $msg);
     }
@@ -686,7 +707,8 @@ EOF;
         }
 
         if (!extension_loaded('pcntl') or
-            !extension_loaded('posix')) {
+            !extension_loaded('posix')
+        ) {
             throw new \Exception(Config\Code::$msg[Config\Code::ERR_EXTENSION], Config\Code::ERR_EXTENSION);
         }
     }
@@ -764,7 +786,7 @@ EOF;
             $tips = 'Press Ctrl+C to quit.';
         }
 
-$note = <<<EOF
+        $note = <<<EOF
 
 -------------------------------------\33[47;30m RunningMan \33[0m-------------------------------------
 RM Version：$rmVersion   PHP Version：$phpVersion   MODE：$mode   Ev：$event   Protocol：$protocol
@@ -822,23 +844,26 @@ EOF;
     /**
      * 接收连接
      * @param  resource $serverSocket 服务器Socket
-     * @param  object   $eventHandler 事件对象
+     * @param  object $eventHandler 事件对象
      * @return void
      */
     public function accept($serverSocket, $flag, $eventHandler)
     {
-        $acceptSocket = stream_socket_accept($serverSocket, 0, $remoteClient);
+        // 惊群 屏蔽错误 Interrupted system call
+        $acceptSocket = @stream_socket_accept($serverSocket, 3, $remoteClient);
         if ($acceptSocket) {
-            $tcpIns = new Connection\Tcp();
-            $tcpIns->acceptSocket = $acceptSocket;
-            $tcpIns->remoteClient = $remoteClient;
-            $tcpIns->eventHandler = $eventHandler;
-            $tcpIns->protocol     = $this->protocol;
-            $tcpIns->onConnect    = $this->onConnect;
-            $tcpIns->onRecv       = $this->onRecv;
-            $tcpIns->onSend       = $this->onSend;
-            $tcpIns->onClose      = $this->onClose;
-            $tcpIns->onError      = $this->onError;
+            $tcpIns            = new Connection\Tcp();
+            $tcpIns->socket    = $acceptSocket;
+            $tcpIns->client    = $remoteClient;
+            $tcpIns->event     = $eventHandler;
+            $tcpIns->protocol  = $this->protocol;
+            $tcpIns->onConnect = $this->onConnect;
+            $tcpIns->onReceive = $this->onReceive;
+            $tcpIns->onSend    = $this->onSend;
+            $tcpIns->onClose   = $this->onClose;
+            $tcpIns->onError   = $this->onError;
+            $tcpIns->ping      = $this->ping;
+            $tcpIns->pong      = $this->pong;
             $tcpIns->accept();
 
             // 加入 socket 列表

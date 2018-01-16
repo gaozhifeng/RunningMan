@@ -4,12 +4,9 @@ namespace RunningMan\Library\Connection;
 
 interface ConnectionInterface
 {
-    public $statistics = [
-        'connection',
-        'request',
-        'response',
-        'exception',
-        'error',
-    ];
+    public function read();
 
+    public function write($data);
+
+    public function close();
 }

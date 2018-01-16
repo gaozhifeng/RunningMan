@@ -20,5 +20,5 @@ class Config
     /**
      * 调试
      */
-    const DEBUG = false;
+    const DEBUG = true;
 }

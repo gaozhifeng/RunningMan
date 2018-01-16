@@ -35,10 +35,10 @@ class Timer
 
     /**
      * 添加任务
-     * @param string  $taskName    任务名
-     * @param array   $callback    回调方法
-     * @param bool    $persistence 持久化
-     * @param integer $interval    间隔s
+     * @param string $taskName 任务名
+     * @param array $callback 回调方法
+     * @param bool $persistence 持久化
+     * @param integer $interval 间隔s
      */
     public static function add($taskName, $callback, $persistence, $interval = 0)
     {
@@ -48,8 +48,8 @@ class Timer
 
         self::$task[$taskName] = [
             'callback'    => (array) $callback,
-            'persistence' => (bool)  $persistence,
-            'interval'    => (int)   $interval,
+            'persistence' => (bool) $persistence,
+            'interval'    => (int) $interval,
             'runtime'     => 0,
         ];
     }

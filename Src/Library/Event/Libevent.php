@@ -25,9 +25,9 @@ class Libevent implements EventInterface
 
     /**
      * 添加事件
-     * @param  resource $socket   监听socket
-     * @param  int      $flag     事件类型
-     * @param  string   $callback 回调
+     * @param  resource $socket 监听socket
+     * @param  int $flag 事件类型
+     * @param  mixed $callback 回调
      * @return bool
      */
     public function add($fd, $flag, $callback)
@@ -64,15 +64,17 @@ class Libevent implements EventInterface
 
     /**
      * 删除事件
-     * @param  resource $fd   监听socket
-     * @param  int      $flag 事件类型
+     * @param  resource $fd 监听socket
+     * @param  int $flag 事件类型
      * @return bool
      */
     public function delete($fd, $flag)
     {
         $sId = (int) $fd;
-        unset($this->event[$sId][$flag]);
-        event_del($this->event[$sId][$flag]);
+        if (isset($this->event[$sId][$flag])) {
+            event_del($this->event[$sId][$flag]);
+            unset($this->event[$sId][$flag]);
+        }
     }
 
     /**

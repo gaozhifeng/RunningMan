@@ -32,9 +32,9 @@ class Select implements EventInterface
 
     /**
      * 添加事件
-     * @param  resource $socket   监听socket
-     * @param  int      $flag     事件类型
-     * @param  string   $callback 回调
+     * @param  resource $socket 监听socket
+     * @param  int $flag 事件类型
+     * @param  string $callback 回调
      * @return bool
      */
     public function add($socket, $flag, $callback)
@@ -61,8 +61,8 @@ class Select implements EventInterface
 
     /**
      * 删除事件
-     * @param  resource $fd   监听socket
-     * @param  int      $flag 事件类型
+     * @param  resource $fd 监听socket
+     * @param  int $flag 事件类型
      * @return bool
      */
     public function delete($fd, $flag)

@@ -27,8 +27,8 @@ class Start
 
 $rmIns = new RunningMan('tcp://0.0.0.0:7266');
 
-$rmIns->onRecv = function ($connection, $data) {
-    $msg = sprintf('[%s] Server To %s: %s', date('Y-m-d H:i:s'), $connection->remoteClient, $data);
+$rmIns->onReceive = function ($connection, $data) {
+    $msg = sprintf('[%s] Server To %s: %s', date('Y-m-d H:i:s'), $connection->client, $data);
     /*$time = date('Y-m-d H:i:s');
     $body = "Hello World 北京 ${time}";
     $chunk = dechex(strlen($body));

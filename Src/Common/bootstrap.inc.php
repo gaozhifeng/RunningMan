@@ -9,9 +9,9 @@
  */
 
 // 定义目录
-define('RM_COMMON',  __DIR__);
-define('RM_ROOT',    dirname(RM_COMMON));
-define('RM_CONFIG',  RM_ROOT . '/Config');
+define('RM_COMMON', __DIR__);
+define('RM_ROOT', dirname(RM_COMMON));
+define('RM_CONFIG', RM_ROOT . '/Config');
 define('RM_LIBRARY', RM_ROOT . '/Library');
 define('RM_RUNTIME', RM_ROOT . '/Runtime');
 

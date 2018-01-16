@@ -10,7 +10,7 @@
 
 namespace RunningMan\Library\Protocol;
 
-class Text
+class Text implements ProtocolInterface
 {
     /**
      * 封包

@@ -1,6 +1,7 @@
 # 关于
 > **RunningMan** 多进程Socket 框架
 
+    - 基于Master / Worker 多进程模型
     - 基于Libevent事件驱动模型
     - 支持start / stop / restart / reload / status 指令
     - 支持SIGINT / SIGALRM / SIGUSR1 / SIGUSR2 信号处理
