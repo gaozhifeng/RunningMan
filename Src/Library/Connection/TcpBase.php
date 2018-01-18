@@ -126,7 +126,7 @@ class TcpBase implements ConnectionInterface
         $flag             = true;
         while ($flag) {
             // 客户端断开会导致读为空
-            if ($this->recvBuffer === '' or $this->recvBuffer === false or feof($this->socket)) {
+            if ($this->recvBuffer === '' or $this->recvBuffer === false or !is_resource($this->socket) or feof($this->socket)) {
                 $this->close();
                 break;
             }
@@ -200,15 +200,17 @@ class TcpBase implements ConnectionInterface
      */
     public function close()
     {
-        -- self::$statistic['connect'];
-        ++ self::$statistic['close'];
+        if (is_resource($this->socket)) {
+            -- self::$statistic['connect'];
+            ++ self::$statistic['close'];
 
-        // 关闭连接
-        is_resource($this->socket) and fclose($this->socket);
-        // 删除事件
-        $this->event->delete($this->socket, Event\EventInterface::EV_READ);
-        $this->event->delete($this->socket, Event\EventInterface::EV_SIGNAL);
-        // 执行回调
-        $this->onClose and call_user_func($this->onClose, $this);
+            fclose($this->socket);
+
+            // 删除事件
+            $this->event->delete($this->socket, Event\EventInterface::EV_READ);
+            $this->event->delete($this->socket, Event\EventInterface::EV_SIGNAL);
+            // 执行回调
+            $this->onClose and call_user_func($this->onClose, $this);
+        }
     }
 }
